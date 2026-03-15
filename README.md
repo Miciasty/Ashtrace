@@ -3,38 +3,39 @@
 Low-level deterministic Java library for broad-phase acceleration helpers and frame-aware voxel tracing pipelines.
 
 > [!NOTE]
-> Ashtrace builds on Ashcore, Ashgrid, and Ashspace.
-> - Mesh extraction belongs to Ashmesh.
-> - Navigation and pathfinding belong to Ashnav.
+> Ashtrace is the tracing layer above Ashspace and Ashgrid:
+> - converts source-frame rays/segments to world space,
+> - filters object candidates with broad-phase AABB queries,
+> - optionally clips object hits by voxel occlusion.
+> Mesh extraction belongs to Ashmesh. Navigation/pathfinding belongs to Ashnav.
 
 ## 1. Purpose
 
-Ashtrace provides reusable tracing primitives so plugins and engines can query space faster without mixing high-level game logic into low-level libraries.
+Ashtrace gives you reusable deterministic tracing primitives so plugins and engines can query space faster without mixing gameplay/domain rules into low-level code.
 
 ## 2. Problem
 
-Spatial projects often need the same glue logic:
-- broad-phase candidate filtering by bounds,
-- mutable acceleration for moving objects,
-- proximity and nearest-candidate queries over bounds,
-- swept AABB candidate filtering for moving volumes,
-- deterministic ray traversal through voxel spaces,
-- frame-aware conversion from local tool/object space into world space before tracing,
-- object tracing clipped by voxel occlusion.
+Spatial projects repeatedly rebuild the same low-level tracing pipeline:
+- convert rays from local tool/object coordinates to world coordinates,
+- find candidate objects via broad-phase AABB queries,
+- support moving objects with mutable indexes,
+- run proximity and sweep candidate queries,
+- traverse voxels in deterministic order,
+- stop object hits at the first voxel occluder when needed.
 
 Without a shared layer, every project re-implements this differently and introduces inconsistent behavior.
 
 ## 3. When to use
 
 Use Ashtrace when:
-- you need deterministic broad-phase candidate filtering,
+- you need deterministic broad-phase candidate filtering over AABBs,
 - you need frame-aware ray queries that combine Ashspace transforms with Ashgrid traversal,
-- you want reusable low-level tracing blocks for higher systems.
+- you need reusable low-level tracing blocks for LOS, hit-scan, and candidate prefiltering.
 
 Do not use Ashtrace when:
 - you need rendering or mesh extraction pipelines,
 - you need full navigation/pathfinding logic,
-- you need project-specific gameplay rules.
+- you need project-specific hit resolution, damage, or gameplay rules.
 
 ## 4. Simple example (Minecraft plugin example)
 
@@ -58,25 +59,28 @@ Ashtrace centralizes this pipeline so every tool uses the same deterministic tra
 
 Definitions:
 - `n`: number of indexed broad-phase entries.
-- `k`: number of visited voxels along a ray.
+- `v`: number of visited voxels along a ray.
+- `h`: number of visited spatial-hash cells.
+- `c`: number of reported candidates.
+- `s`: number of hash cells covered by an updated/inserted entry.
 
 | Operation | Complexity | Notes |
 | --- | --- | --- |
 | `LinearAabbBroadPhase3.query` | `O(n)` | Linear scan over registered AABBs. |
 | `BvhAabbBroadPhase3` build | `O(n log^2 n)` | Median split with per-level sort. |
 | `BvhAabbBroadPhase3.query` | average `O(log n + c)` | `c` is number of reported candidates. |
-| `DynamicSpatialHashBroadPhase3.insert/update/remove` | average `O(k)` | `k` is number of covered hash cells. |
+| `DynamicSpatialHashBroadPhase3.insert/update/remove` | average `O(s)` | `s` is number of covered hash cells. |
 | `DynamicSpatialHashBroadPhase3.query` | average `O(c + h)` | `h` is visited hash cells, `c` is candidates. |
 | `DynamicBvhBroadPhase3.insert/update/remove` | `O(1)` mutation, deferred rebuild | Mutations mark snapshot dirty; rebuild is delayed until a query. |
 | `DynamicBvhBroadPhase3.first query after mutation` | `O(n log^2 n)` | Lazy BVH snapshot rebuild cost; later read-only queries use BVH query complexity. |
 | `*.querySphere` | linear/BVH/hash-accelerated variant dependent | Sphere-vs-AABB candidate filtering. |
 | `*.nearest` | variant dependent (`O(n)` worst case) | Returns closest AABB candidate within max distance. |
 | `*.querySweptAabb` | variant dependent | Swept AABB candidate intervals in normalized time. |
-| `FrameGridRayTracer3.firstHit` | `O(k)` worst case | Stops early on first occupied voxel. |
-| `FrameGridRayTracer3.allHits` | `O(k)` | Walks visited cells and filters by occupancy. |
-| `FrameGridRayTracer3.firstSegmentHit` | `O(k)` worst case | Same traversal with finite `tMax = segment length`. |
+| `FrameGridRayTracer3.firstHit` | `O(v)` worst case | Stops early on first occupied voxel. |
+| `FrameGridRayTracer3.allHits` | `O(v)` | Walks visited cells and filters by occupancy. |
+| `FrameGridRayTracer3.firstSegmentHit` | `O(v)` worst case | Same traversal with finite `tMax = segment length`. |
 | `FrameBroadPhaseRayTracer3.firstHit` | average `O(q + m)` | `q` broad-phase query work, `m` narrow-phase checks. |
-| `FrameOccludedBroadPhaseRayTracer3.firstVisibleHit` | average `O(q + m + k)` | Broad-phase object trace clipped by first voxel occluder. |
+| `FrameOccludedBroadPhaseRayTracer3.firstVisibleHit` | average `O(q + m + v)` | Broad-phase object trace clipped by first voxel occluder. |
 
 ## 7. Core terms
 
