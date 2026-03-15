@@ -121,6 +121,7 @@ class FrameBroadPhaseRayTracer3ApiTest {
 
         // WHEN / THEN
         assertThrows(IllegalArgumentException.class, () -> tracer.firstHit(frames.root(), ray, Double.NaN, (v, wr, t0, t1) -> true));
+        assertThrows(IllegalArgumentException.class, () -> tracer.allHits(frames.root(), ray, Double.POSITIVE_INFINITY, (v, wr, t0, t1) -> true));
         assertThrows(IllegalArgumentException.class, () -> tracer.firstSegmentHit(frames.root(), pointSegment, (v, wr, t0, t1) -> true));
         assertThrows(IllegalArgumentException.class, () -> tracer.allHits(frames.root(), ray, 10.0, (v, wr, t0, t1) -> true, 0));
     }

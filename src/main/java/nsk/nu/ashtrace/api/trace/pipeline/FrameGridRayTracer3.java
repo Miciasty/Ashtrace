@@ -49,6 +49,7 @@ public final class FrameGridRayTracer3 {
      * Trace first occupied voxel hit using a ray defined in {@code sourceFrame}.
      *
      * <p>If multiple cells begin at the same boundary, tie-breaking follows the traverser's visit order.</p>
+     * <p>{@code tMax} is a finite world-space distance along the normalized world ray.</p>
      *
      * @return first hit, or {@code null} if no hit exists up to {@code tMax}
      */
@@ -56,7 +57,7 @@ public final class FrameGridRayTracer3 {
         if (sourceFrame == null) throw new NullPointerException("sourceFrame");
         if (sourceRay == null) throw new NullPointerException("sourceRay");
         if (occupancy == null) throw new NullPointerException("occupancy");
-        if (Double.isNaN(tMax) || tMax < 0.0) throw new IllegalArgumentException("tMax must be >= 0 and not NaN");
+        if (!Double.isFinite(tMax) || tMax < 0.0) throw new IllegalArgumentException("tMax must be finite and >= 0");
 
         Ray worldRay = converter.ray(sourceRay, sourceFrame, frames.root());
         Raycast.Hit hit = raycast.first(worldRay, tMax, occupancy);
@@ -74,6 +75,7 @@ public final class FrameGridRayTracer3 {
     /**
      * Trace all occupied voxel hits using a ray defined in {@code sourceFrame}.
      * Hits are returned in deterministic traverser visit order.
+     * {@code tMax} is a finite world-space distance along the normalized world ray.
      */
     public List<GridRayHit3> allHits(FrameId sourceFrame, Ray sourceRay, double tMax, Raycast.Occupancy occupancy) {
         return allHits(sourceFrame, sourceRay, tMax, occupancy, Integer.MAX_VALUE);
@@ -82,6 +84,7 @@ public final class FrameGridRayTracer3 {
     /**
      * Trace occupied voxel hits up to {@code maxHits} using a ray defined in {@code sourceFrame}.
      * Hits are returned in deterministic traverser visit order.
+     * {@code tMax} is a finite world-space distance along the normalized world ray.
      */
     public List<GridRayHit3> allHits(
             FrameId sourceFrame,
@@ -93,7 +96,7 @@ public final class FrameGridRayTracer3 {
         if (sourceFrame == null) throw new NullPointerException("sourceFrame");
         if (sourceRay == null) throw new NullPointerException("sourceRay");
         if (occupancy == null) throw new NullPointerException("occupancy");
-        if (Double.isNaN(tMax) || tMax < 0.0) throw new IllegalArgumentException("tMax must be >= 0 and not NaN");
+        if (!Double.isFinite(tMax) || tMax < 0.0) throw new IllegalArgumentException("tMax must be finite and >= 0");
         if (maxHits <= 0) throw new IllegalArgumentException("maxHits must be > 0");
 
         Ray worldRay = converter.ray(sourceRay, sourceFrame, frames.root());

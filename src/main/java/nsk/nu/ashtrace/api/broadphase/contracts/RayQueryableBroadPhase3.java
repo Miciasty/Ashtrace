@@ -13,11 +13,20 @@ public interface RayQueryableBroadPhase3<T> extends BroadPhase3<T> {
 
     /**
      * Emits broad-phase candidates intersected by {@code ray} up to {@code tMax}.
+     *
+     * <p>{@code tMax} is a finite world-space distance along the normalized ray direction,
+     * in closed interval {@code [0, tMax]}.</p>
+     *
+     * <p>Each emitted hit uses boundary-inclusive interval {@code [tEnter, tExit]} where
+     * both values are in world-space distance units from {@code ray.origin()}.</p>
      */
     void queryRay(Ray ray, double tMax, Consumer<BroadPhaseRayHit3<T>> consumer);
 
     /**
      * Emits broad-phase candidates intersected by finite {@code segment}.
+     *
+     * <p>Equivalent to {@code queryRay} with ray origin at {@code segment.a()},
+     * ray direction toward {@code segment.b()}, and {@code tMax = segment.length()}.</p>
      */
     default void querySegment(Segment3 segment, Consumer<BroadPhaseRayHit3<T>> consumer) {
         if (segment == null) throw new NullPointerException("segment");

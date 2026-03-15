@@ -52,8 +52,7 @@ Ashtrace centralizes this pipeline so every tool uses the same deterministic tra
 2. Voxel tracing supports first-hit and all-hit queries for both rays and finite segments.
 3. `FrameBroadPhaseRayTracer3` performs frame-aware broad-phase candidate tracing with narrow-phase acceptance.
 4. `FrameOccludedBroadPhaseRayTracer3` combines object broad-phase tracing with first-voxel occlusion clipping.
-5. `RayQueryableBroadPhase3`, `ProximityQueryableBroadPhase3`, and `SweepQueryableBroadPhase3` define deterministic low-level query contracts.
-6. `LinearAabbBroadPhase3`, `BvhAabbBroadPhase3`, `DynamicSpatialHashBroadPhase3`, and `DynamicBvhBroadPhase3` cover baseline, static accelerated, and two mutable accelerated strategies.
+5. `RayQueryableBroadPhase3`, `ProximityQueryableBroadPhase3`, and `SweepQueryableBroadPhase3` define deterministic query contracts implemented by `LinearAabbBroadPhase3`, `BvhAabbBroadPhase3`, `DynamicSpatialHashBroadPhase3`, and `DynamicBvhBroadPhase3`.
 
 ## 6. Big-O for operations
 
@@ -68,6 +67,8 @@ Definitions:
 | `BvhAabbBroadPhase3.query` | average `O(log n + c)` | `c` is number of reported candidates. |
 | `DynamicSpatialHashBroadPhase3.insert/update/remove` | average `O(k)` | `k` is number of covered hash cells. |
 | `DynamicSpatialHashBroadPhase3.query` | average `O(c + h)` | `h` is visited hash cells, `c` is candidates. |
+| `DynamicBvhBroadPhase3.insert/update/remove` | `O(1)` mutation, deferred rebuild | Mutations mark snapshot dirty; rebuild is delayed until a query. |
+| `DynamicBvhBroadPhase3.first query after mutation` | `O(n log^2 n)` | Lazy BVH snapshot rebuild cost; later read-only queries use BVH query complexity. |
 | `*.querySphere` | linear/BVH/hash-accelerated variant dependent | Sphere-vs-AABB candidate filtering. |
 | `*.nearest` | variant dependent (`O(n)` worst case) | Returns closest AABB candidate within max distance. |
 | `*.querySweptAabb` | variant dependent | Swept AABB candidate intervals in normalized time. |

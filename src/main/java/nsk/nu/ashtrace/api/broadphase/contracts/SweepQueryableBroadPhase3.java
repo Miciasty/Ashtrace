@@ -14,7 +14,8 @@ public interface SweepQueryableBroadPhase3<T> extends BroadPhase3<T> {
     /**
      * Emits broad-phase candidates intersected by {@code movingBounds} swept by {@code delta}.
      *
-     * <p>Returned intervals are normalized over sweep time {@code [0, 1]}.</p>
+     * <p>{@code movingBounds} is world-space AABB (inclusive bounds), {@code delta} is world-space motion vector,
+     * and returned intervals are boundary-inclusive normalized sweep time values in {@code [0, 1]}.</p>
      */
     void querySweptAabb(
             AxisAlignedBox movingBounds,

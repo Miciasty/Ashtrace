@@ -121,7 +121,7 @@ class FrameGridRayTracer3ApiTest {
     }
 
     @Test
-    void nan_tmax_is_rejected() {
+    void non_finite_tmax_is_rejected() {
         // GIVEN
         FrameGraph3 frames = FrameGraph3.worldRoot();
         VoxelTraverser traverser = ServiceRegistry.of(VoxelTraverser.class).require("dda");
@@ -131,5 +131,7 @@ class FrameGridRayTracer3ApiTest {
         // WHEN / THEN
         assertThrows(IllegalArgumentException.class, () -> tracer.firstHit(frames.root(), ray, Double.NaN, (x, y, z) -> true));
         assertThrows(IllegalArgumentException.class, () -> tracer.allHits(frames.root(), ray, Double.NaN, (x, y, z) -> true));
+        assertThrows(IllegalArgumentException.class, () -> tracer.firstHit(frames.root(), ray, Double.POSITIVE_INFINITY, (x, y, z) -> true));
+        assertThrows(IllegalArgumentException.class, () -> tracer.allHits(frames.root(), ray, Double.POSITIVE_INFINITY, (x, y, z) -> true));
     }
 }

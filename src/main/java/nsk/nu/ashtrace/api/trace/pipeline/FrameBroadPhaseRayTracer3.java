@@ -54,6 +54,7 @@ public final class FrameBroadPhaseRayTracer3<T> {
 
     /**
      * Trace first accepted hit for a source-frame ray.
+     * {@code tMax} is a finite world-space distance along the normalized world ray.
      */
     public TraceHit3<T> firstHit(
             FrameId sourceFrame,
@@ -64,7 +65,7 @@ public final class FrameBroadPhaseRayTracer3<T> {
         if (sourceFrame == null) throw new NullPointerException("sourceFrame");
         if (sourceRay == null) throw new NullPointerException("sourceRay");
         if (narrowPhase == null) throw new NullPointerException("narrowPhase");
-        if (Double.isNaN(tMax) || tMax < 0.0) throw new IllegalArgumentException("tMax must be >= 0 and not NaN");
+        if (!Double.isFinite(tMax) || tMax < 0.0) throw new IllegalArgumentException("tMax must be finite and >= 0");
 
         Ray worldRay = converter.ray(sourceRay, sourceFrame, frames.root());
         List<BroadPhaseRayHit3<T>> candidates = orderedCandidates(worldRay, tMax);
@@ -82,6 +83,7 @@ public final class FrameBroadPhaseRayTracer3<T> {
 
     /**
      * Trace all accepted hits for a source-frame ray.
+     * {@code tMax} is a finite world-space distance along the normalized world ray.
      */
     public List<TraceHit3<T>> allHits(
             FrameId sourceFrame,
@@ -94,6 +96,7 @@ public final class FrameBroadPhaseRayTracer3<T> {
 
     /**
      * Trace accepted hits for a source-frame ray up to {@code maxHits}.
+     * {@code tMax} is a finite world-space distance along the normalized world ray.
      */
     public List<TraceHit3<T>> allHits(
             FrameId sourceFrame,
@@ -105,7 +108,7 @@ public final class FrameBroadPhaseRayTracer3<T> {
         if (sourceFrame == null) throw new NullPointerException("sourceFrame");
         if (sourceRay == null) throw new NullPointerException("sourceRay");
         if (narrowPhase == null) throw new NullPointerException("narrowPhase");
-        if (Double.isNaN(tMax) || tMax < 0.0) throw new IllegalArgumentException("tMax must be >= 0 and not NaN");
+        if (!Double.isFinite(tMax) || tMax < 0.0) throw new IllegalArgumentException("tMax must be finite and >= 0");
         if (maxHits <= 0) throw new IllegalArgumentException("maxHits must be > 0");
 
         Ray worldRay = converter.ray(sourceRay, sourceFrame, frames.root());

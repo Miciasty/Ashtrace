@@ -16,6 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DynamicBvhBroadPhase3Test {
@@ -72,6 +73,18 @@ class DynamicBvhBroadPhase3Test {
         assertEquals(2, sweepHits.size());
         assertEquals("near", sweepHits.get(0).value());
         assertEquals("far", sweepHits.get(1).value());
+    }
+
+    @Test
+    void ray_query_rejects_non_finite_tmax() {
+        // GIVEN
+        DynamicBvhBroadPhase3<String> bvh = new DynamicBvhBroadPhase3<>();
+        bvh.insert(box(1, 1, 1, 2, 2, 2), "A");
+        Ray ray = new Ray(new Vector3(0, 1.5, 1.5), new Vector3(1, 0, 0));
+
+        // WHEN / THEN
+        assertThrows(IllegalArgumentException.class, () -> bvh.queryRay(ray, Double.NaN, hit -> { }));
+        assertThrows(IllegalArgumentException.class, () -> bvh.queryRay(ray, Double.POSITIVE_INFINITY, hit -> { }));
     }
 
     private static AxisAlignedBox box(

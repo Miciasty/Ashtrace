@@ -119,6 +119,18 @@ class DynamicSpatialHashBroadPhase3Test {
         assertEquals("far", sweepHits.get(1).value());
     }
 
+    @Test
+    void ray_query_rejects_non_finite_tmax() {
+        // GIVEN
+        DynamicSpatialHashBroadPhase3<String> hash = new DynamicSpatialHashBroadPhase3<>(1.0);
+        hash.insert(box(1, 1, 1, 2, 2, 2), "A");
+        Ray ray = new Ray(new Vector3(0, 1.5, 1.5), new Vector3(1, 0, 0));
+
+        // WHEN / THEN
+        assertThrows(IllegalArgumentException.class, () -> hash.queryRay(ray, Double.NaN, hit -> { }));
+        assertThrows(IllegalArgumentException.class, () -> hash.queryRay(ray, Double.POSITIVE_INFINITY, hit -> { }));
+    }
+
     private static AxisAlignedBox box(
             double minX, double minY, double minZ,
             double maxX, double maxY, double maxZ

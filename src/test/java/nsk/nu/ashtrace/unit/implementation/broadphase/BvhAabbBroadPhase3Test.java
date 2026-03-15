@@ -17,6 +17,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BvhAabbBroadPhase3Test {
@@ -151,6 +152,19 @@ class BvhAabbBroadPhase3Test {
         assertEquals("near", hits.get(0).value());
         assertEquals("far", hits.get(1).value());
         assertEquals(0.2, hits.get(0).tEnter(), 1e-9);
+    }
+
+    @Test
+    void ray_query_rejects_non_finite_tmax() {
+        // GIVEN
+        BvhAabbBroadPhase3<String> bvh = new BvhAabbBroadPhase3<>(List.of(
+                new AabbEntry3<>(box(1, 1, 1, 2, 2, 2), "A")
+        ));
+        Ray ray = new Ray(new Vector3(0, 1.5, 1.5), new Vector3(1, 0, 0));
+
+        // WHEN / THEN
+        assertThrows(IllegalArgumentException.class, () -> bvh.queryRay(ray, Double.NaN, hit -> { }));
+        assertThrows(IllegalArgumentException.class, () -> bvh.queryRay(ray, Double.POSITIVE_INFINITY, hit -> { }));
     }
 
     private static AxisAlignedBox box(

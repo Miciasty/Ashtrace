@@ -19,6 +19,9 @@ import java.util.function.Consumer;
 
 /**
  * Mutable broad-phase that keeps insertion/update API and uses a lazily rebuilt BVH snapshot for queries.
+ *
+ * <p>Mutations are cheap and only mark snapshot as dirty. The next query rebuilds the snapshot
+ * with deterministic BVH build cost.</p>
  */
 public final class DynamicBvhBroadPhase3<T> implements MutableRayBroadPhase3<T> {
     private final Map<Long, Entry<T>> entries = new LinkedHashMap<>();
@@ -79,7 +82,7 @@ public final class DynamicBvhBroadPhase3<T> implements MutableRayBroadPhase3<T> 
     public void queryRay(Ray ray, double tMax, Consumer<BroadPhaseRayHit3<T>> consumer) {
         if (ray == null) throw new NullPointerException("ray");
         if (consumer == null) throw new NullPointerException("consumer");
-        if (Double.isNaN(tMax) || tMax < 0.0) throw new IllegalArgumentException("tMax must be >= 0 and not NaN");
+        if (!Double.isFinite(tMax) || tMax < 0.0) throw new IllegalArgumentException("tMax must be finite and >= 0");
 
         ensureSnapshot();
         snapshot.queryRay(ray, tMax, hit -> consumer.accept(new BroadPhaseRayHit3<>(
