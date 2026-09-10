@@ -19,8 +19,8 @@
     "directory": "Ashspace",
     "artifactId": "ashspace",
     "version": "2.0.0-SNAPSHOT",
-    "sourceCommit": "a4c813b",
-    "jarSha256": "232b5524c201d881cfb9287906ca2eea74c2f3ee372dc0202ea1c568f46a019d",
-    "pomSha256": "60e5c008d3428c17abcbe7b95ee1780b849c8d515d1cd8c643594cb13afd499f"
+    "sourceCommit": "f652173",
+    "jarSha256": "7f0e82346ee9c880a42e68eb24902439af7e9aba5ad7222b39930d9ab3cb0e94",
+    "pomSha256": "3aefb1556e47d99fd6a86b736d31006af4543dcf04e2972afe71ea83c645c073"
   }
 ]

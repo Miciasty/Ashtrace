@@ -1,0 +1,13 @@
+[
+  "Ashcore/src/test/java/nsk/nu/ashcore/api/math/NormalizationTest.java",
+  "Ashcore/src/test/java/nsk/nu/ashcore/api/collision/CollisionApiTest.java",
+  "Ashcore/src/test/java/nsk/nu/ashcore/api/collision/CollisionBoundaryTest.java",
+  "Ashcore/src/test/java/nsk/nu/ashcore/api/collision/PrimitiveIntersectionTest.java",
+  "Ashgrid/src/test/java/nsk/nu/ashgrid/integration/voxel/TraversalBoundaryTest.java",
+  "Ashgrid/src/test/java/nsk/nu/ashgrid/integration/voxel/TraversalAndQueryIntegrationTest.java",
+  "Ashgrid/src/test/java/nsk/nu/ashgrid/implementation/raster/HashSparseGrid3iTest.java",
+  "Ashspace/src/test/java/nsk/nu/ashspace/integration/space/FrameSpaceIntegrationTest.java",
+  "Ashspace/src/test/java/nsk/nu/ashspace/integration/grid/MovingGridIntegrationTest.java",
+  "Ashspace/src/test/java/nsk/nu/ashspace/integration/grid/GridMappingIntegrationTest.java",
+  "Ashspace/src/test/java/nsk/nu/ashspace/api/grid/FrameGridSpaceMapper3ApiTest.java"
+]

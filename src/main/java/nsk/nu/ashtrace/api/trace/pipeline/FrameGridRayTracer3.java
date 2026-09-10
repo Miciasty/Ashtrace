@@ -45,8 +45,9 @@ public final class FrameGridRayTracer3 {
     /**
      * Trace a grid attached to a frame. Retains the mapper and its live or frozen graph.
      * World distance is divided by cellSize for traversal and multiplied back for results.
-     * The normalized cell ray and positive distance limit must remain representable; overflow
-     * or loss of a positive limit to zero is rejected. Mapping does not add a boundary epsilon.
+     * The normalized cell ray and positive distance limit must remain representable; overflow,
+     * loss of a nonzero origin offset to zero, or loss of a positive limit to zero is rejected.
+     * Mapping does not add a boundary epsilon.
      */
     public static FrameGridRayTracer3 forGrid(FrameGridSpaceMapper3 grid, VoxelTraverser traverser) {
         return new FrameGridRayTracer3(grid, traverser);
@@ -184,12 +185,21 @@ public final class FrameGridRayTracer3 {
         Ray inGrid = converter.ray(sourceRay, sourceFrame, grid.gridFrame());
         Vector3 offset = inGrid.origin().sub(grid.gridOrigin());
         double size = grid.cellSize();
-        Vector3 origin = new Vector3(offset.x() / size, offset.y() / size, offset.z() / size);
+        Vector3 origin = new Vector3(cellCoordinate(offset.x(), size), cellCoordinate(offset.y(), size),
+                cellCoordinate(offset.z(), size));
         double limit = tMax / size;
         if (!Double.isFinite(limit) || (tMax > 0.0 && limit == 0.0)) {
             throw new IllegalArgumentException("grid traversal distance is not representable");
         }
         return new QueryRay(worldRay, new Ray(origin, inGrid.direction()), limit, tMax, size);
+    }
+
+    private static double cellCoordinate(double offset, double size) {
+        double coordinate = offset / size;
+        if (!Double.isFinite(coordinate) || (offset != 0.0 && coordinate == 0.0)) {
+            throw new IllegalArgumentException("grid origin coordinate is not representable");
+        }
+        return coordinate;
     }
 
     private GridRayHit3 hit(QueryRay query, int x, int y, int z, double enter, double exit) {

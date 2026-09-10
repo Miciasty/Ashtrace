@@ -1,6 +1,6 @@
 # Ashtrace verification and migration
 
-Latest work: [mapped grids, shape intervals and query reuse](#2026-09-10--mapped-grids-shape-intervals-and-query-reuse).
+Latest work: [cross-library integration and quotient underflow](#2026-09-10--cross-library-integration-and-quotient-underflow).
 The first record below describes the earlier correction checkpoint; its artifact hashes are historical.
 
 ## 2026-09-10 — Blackframe contract revision 2.0 corrections
@@ -282,3 +282,118 @@ releases and update the pinned coordinates/manifest accordingly, then rerun inte
 hosted Java 21/25 matrix. Record its URL/commit before selecting a final release tag and destination.
 The existing publishing workflow rejects snapshot Ashtrace/dependency versions. No push, remote CI,
 deploy, GitHub release or Central publication was performed in this extension session.
+
+## 2026-09-10 — Cross-library integration and quotient underflow
+
+Branch `test/ashtrace-blackframe-integration-20260910`, checkpoint `8d70f81`, base `a6bf6f1`.
+Initially all writes were confined to Ashtrace. After the integration test exposed a lower-layer
+defect, the user authorized fixing a blocking defect in its owning library. Ashspace was fixed
+on a separate branch/checkpoint (`51f5340`), correction commit **`f652173`**. Ashcore, Ashgrid and
+Ashnav remained unchanged. No push, deployment or publication occurred.
+
+### Reproduction and correction
+
+The unchanged Ashspace `GridMappingIntegrationTest` failed with Ashtrace's actual dependency set:
+origin zero, cellSize 2, point X = `-Double.MIN_VALUE`. Division returns -0.0; Ashspace selected
+cell 0 while Ashgrid `VoxelSpace` selected -1. This is an extreme-input indexing discrepancy,
+not a general outage in ordinary-scale tracing. It violates the shared cell contract, so it was
+treated as an integration/release blocker. The old Ashspace build used Ashgrid 1.2.0, whose
+behavior did not reveal disagreement with the corrected Ashgrid 1.3.0-SNAPSHOT helper.
+
+Ashspace now retains the sign of an underflowed quotient for internal floor/ceil selection.
+The correction includes positive/negative half-open range endpoints; it does not recover accurate
+distances from a quotient too small for double. Its POM now pins Ashcore 1.1.0-SNAPSHOT and
+Ashgrid 1.3.0-SNAPSHOT. See [SPACE-011 evidence](../Ashspace/VERIFICATION.md#2026-09-10--grid-quotient-underflow-space-011).
+
+Ashtrace rejects an origin component whose nonzero grid-relative offset divides to zero, before
+calling occupancy. This avoids silently placing the ray on the boundary or inventing a distance.
+It is an explicit representability check on the mapped tracer; exact zero is still valid, and no
+epsilon changes ordinary membership. Existing positive-distance underflow rejection remains.
+
+The final diagnostic for point `(-Double.MIN_VALUE, 0.5, 0.5)` and cellSize 2 reports:
+
+```text
+point.x=-4.9E-324 quotient=-0.0
+VoxelSpace x=-1
+GridSpaceMapper3 x=-1
+FrameGridSpaceMapper3 x=-1
+Ashtrace rejects: grid origin coordinate is not representable
+```
+
+### Tests and results
+
+`BlackframeGridContractIntegrationTest` and `BlackframeGeometryContractIntegrationTest` add 12
+Ashtrace tests using the neighboring libraries' fixtures. They cover ray/sweep/sphere agreement
+across all four indexes, Ashcore sphere entry/exit (including inside and tangent cases), normalized
+extreme input directions, nested frame transforms, moving sparse storage, six axis directions,
+eight direction octants, DDA zero-length corner visits, clipped traversers in cell coordinates,
+large-world relative mapping, coordinate underflow and Raycast versus LineOfSight start-cell rules.
+
+The optional `scripts/verify-blackframe-tests.ps1` first runs the full Ashtrace gate through
+`verify-local.ps1`. It then copies the 11 files selected in `blackframe-contract-tests.json` into
+a fresh run directory under `.verification/blackframe-tests`. It checks their SHA-256 before
+copying and again after execution; the originals are neither edited nor built in place. A standalone
+POM copies Ashtrace's pinned dependencies, properties and compiler/Surefire configuration. No
+production dependency on a higher layer, extra test framework or published test artifact is added.
+
+| Original library tests | Classes | Tests |
+| --- | ---: | ---: |
+| Ashcore normalization / collision API / collision boundaries / primitives | 4 | 23 |
+| Ashgrid traversal/query / traversal boundaries / sparse storage | 3 | 17 |
+| Ashspace chained frames / moving grid / grid mapping / frame-grid mapper | 4 | 14 |
+| Total unchanged test sources | 11 | 54 |
+
+| Verification | Actual result |
+| --- | --- |
+| Initial new Ashtrace scenarios | 10/11 passed; the sphere assertion compared 1.0 with 0.9999999999999998. It now uses the same 1e-12 unit-scale tolerance as Ashcore's primitive tests, without changing runtime geometry. |
+| Initial imported original tests | 53/54 passed; the grid-mapping test exposed the dependency discrepancy. It was not disabled, edited or removed. |
+| Ashtrace representability regression before the guard | Failed: no exception was thrown and occupancy could be queried in the wrong cell. |
+| Ashspace mapping regressions before its fix | 7 tests, 3 failures (original mapping test and two new point/range regressions). |
+| Ashspace `clean verify dependency:tree`, JDK 21 | **74 + 2 passed**, no failures/errors/skips. |
+| Ashtrace full gate plus original library tests, JDK 21 | **97 + 2 + 54 passed**, no failures/errors/skips; gates finished 09:38:02 and 09:38:07 +02:00. |
+| Same complete script, JDK 25 | **97 + 2 + 54 passed**, no failures/errors/skips; finished 09:38:39 and 09:38:43 +02:00. |
+| Public API comparison | Ashtrace 26 existing types / 211 declarations; Ashspace 10 / 128. No removals or changed declarations. |
+| Minimal boundary diagnostic after the fix | Both mappers match VoxelSpace; mapped tracing rejects loss of the nonzero coordinate. |
+
+Environment: Maven 3.9.16, Adoptium JDK 21.0.12.1+1 and Oracle OpenJDK 25.0.2, Windows 11 amd64,
+UTF-8, pl_PL. Both compile for release 21. Four README programs and packaged main/source/Javadoc
+content checks ran on both JDKs. Ashspace's JAR was built on JDK 21 and consumed on both runtimes.
+
+Two harness setup attempts failed before executing the imported tests: a JAR project cannot be a
+Maven parent, and Maven rejected redundant namespace declarations on copied plugin elements. The
+final standalone POM avoids both. One Ashspace clean attempt failed on an execution-account file
+ownership conflict; cleanup was confined to its verified target directory before a successful gate.
+These setup failures are retained in the logs and are distinct from the reproduced geometry defect.
+
+Logs: `.verification/blackframe-corrected-jdk21.log`, `blackframe-corrected-jdk25.log`,
+`blackframe-api.log`, `ashspace-underflow-api.log`, `grid-boundary-diagnostic.log`, and the earlier
+`blackframe-*` / `ashspace-underflow-*` failure logs. Successful original-test run directories end
+in `3496b6341f904d1f9f43bb1bd9990e04` (21) and `9d6d89aff5e94729bd015e4da07d1c96` (25); each
+contains `imports.json` with source paths/hashes and its own Surefire reports.
+
+### Current artifact identities and reproduction
+
+The development manifest now selects Ashspace commit `f652173`, JAR SHA-256
+`7f0e82346ee9c880a42e68eb24902439af7e9aba5ad7222b39930d9ab3cb0e94`, POM SHA-256
+`3aefb1556e47d99fd6a86b736d31006af4543dcf04e2972afe71ea83c645c073`. Core/Grid identities are unchanged.
+The older Ashspace identity in the preceding historical sections must not replace this corrected one.
+
+| Ashtrace artifact | JDK 21 SHA-256 | JDK 25 SHA-256 |
+| --- | --- | --- |
+| Main | `753b370463d547b0b88d3b7be7712827527de0c3a3aee8c6d6d6c82552c213b0` | `c72a16030e4eebc1414f94c16d89ae4c5196e9f55ef1078dcad141848bdda67d` |
+| Sources | `b068c76b0f359f1def4004655895f56c62b9843c8efdb85d97c9c044ed80d341` | `b068c76b0f359f1def4004655895f56c62b9843c8efdb85d97c9c044ed80d341` |
+| Javadoc | `ce19e1a5570ca243c96877fc9719500083e899ebcdc4248d0c003e37245a0318` | `b5d57bdd74d105a9e47ab9a966b858581f725ac25365a957b35e9554138acd66` |
+
+JDK 21 output was preserved in `.verification/integration-artifacts-jdk21`; `target` is the JDK 25
+build. Hash differences across JDKs are not a cross-toolchain reproducibility claim.
+
+With matching dependency artifacts and source tests available, reproduce from Ashtrace using:
+
+```powershell
+& ./scripts/verify-blackframe-tests.ps1 -DependencyRoot ../
+```
+
+Optional `-JavaHome`, `-MavenCommand` and `-SettingsFile` select the environment. All script output,
+test copies and dependency installs stay in Ashtrace. Repairing Ashspace was a separate authorized
+source change, not an action performed by this script. TRACE-010 still needs artifact distribution
+and hosted CI before release; local success does not establish publication availability.

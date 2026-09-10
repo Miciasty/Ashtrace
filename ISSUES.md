@@ -49,6 +49,7 @@ Maven używa zależności rozstrzygniętych z POM i repozytoriów artefaktów. Z
 | [TRACE-008](#trace-008) | P2 | DECYZJA | Zwracać wejście i wyjście z geometrii dostawcy |
 | [TRACE-009](#trace-009) | P2 | INSPEKCJA | Dodać zatrzymywanie zapytań i ponowne użycie bufora |
 | [TRACE-010](#trace-010) | P1 | AUDYT | Odtworzyć build na hosted CI i potwierdzić gotowość wydania |
+| [TRACE-011](#trace-011) | P1 | AUDYT | Sprawdzić integrację z oryginalnymi testami dolnych warstw |
 
 <a id="trace-001"></a>
 
@@ -306,6 +307,41 @@ gałęzi nie odtwarza zestawu użytego w testach. Nie zmieniano/pushowano tych b
 deploy i nie uznano lokalnych snapshotów za potwierdzone wydanie. Instrukcja odtworzenia oraz dowody:
 [VERIFICATION.md](VERIFICATION.md#2026-09-10--mapped-grids-shape-intervals-and-query-reuse).
 
+<a id="trace-011"></a>
+
+## TRACE-011 — Sprawdzić integrację z oryginalnymi testami dolnych warstw
+
+**Status:** GOTOWE
+
+**Zakres:** użytkownik wskazał testy innych bibliotek jako dodatkowe źródło sprawdzenia integracji.
+Utworzono gałąź `test/ashtrace-blackframe-integration-20260910` i checkpoint `8d70f81` z bazy `a6bf6f1`.
+Dodano 12 testów w Ashtrace opartych na scenariuszach Ashcore/Ashgrid/Ashspace oraz skrypt uruchamiający
+54 testy z 11 oryginalnych plików, kopiowanych bez zmian do izolowanego katalogu w Ashtrace.
+
+**Wykryty błąd:** oryginalny `GridMappingIntegrationTest` nie przeszedł dla ujemnego offsetu, którego
+iloraz przez rozmiar komórki zaokrągla się do -0.0. Ashgrid wskazywał komórkę -1, a Ashspace 0.
+Po dodatkowej zgodzie użytkownika poprawiono właściciela mapowania w osobnym repozytorium Ashspace:
+[SPACE-011](../Ashspace/ISSUES.md#space-011), commit `f652173`. Przypadek jest skrajny numerycznie,
+ale narusza podstawowy kontrakt komórki/zakresu i blokował zgodność zestawu. Ashgrid/Ashcore nie zmieniano.
+
+Ashtrace odrzuca utratę niezerowego offsetu promienia do zera przed wywołaniem occupancy, ponieważ
+odtworzenie strony granicy dla indeksowania nie odtwarza odległości przebiegu promienia. Nie dodano
+epsilona ani nie zmieniono reguł dla reprezentowalnych współrzędnych. Manifest zależności wskazuje
+nowy, sprawdzony JAR i POM Ashspace; jego zależności także odpowiadają Ashcore 1.1 / Ashgrid 1.3 snapshot.
+
+- [x] Wszystkie cztery indeksy porównano z obliczeniami przecięć/sweep/proximity Ashcore.
+- [x] Rzeczywiste wejście/wyjście sfery pochodzi z obliczeń Ashcore; sprawdzono styczność, start wewnątrz i ramki zagnieżdżone.
+- [x] Sprawdzono sześć kierunków osi, osiem oktantów, remisy DDA, przycinany traverser, ruchomy magazyn wokseli i lokalne współrzędne przy dużym przesunięciu świata.
+- [x] Oryginalnych 54 testów nie poprawiano ani nie pomijano; po naprawie Ashspace wszystkie przechodzą.
+- [x] JDK 21 i 25: po 97 testów Ashtrace + 2 testy artefaktów + 54 testy zależności, bez błędów/pominięć.
+- [x] Ashspace: pełne 74 + 2 PASS na JDK 21; javap obu bibliotek potwierdza brak usunięć publicznych deklaracji.
+
+Pierwsza asercja testu sfery wymagała tolerancji 1e-12 dla danych jednostkowej skali, zgodnej z
+testami Ashcore (1.0 wobec 0.9999999999999998). Dwie próby skonfigurowania pomocniczego POM zakończyły
+się błędami przed testami; skrypt poprawiono. Właściwe regresje błędu mapowania zawiodły przed zmianą
+i przeszły po niej. Logi, wersje, hashe, polecenia i szczegóły w [VERIFICATION.md](VERIFICATION.md).
+TRACE-010 nadal wymaga udostępnienia zależności oraz wykonania zdalnego CI przed wydaniem.
+
 ## Stan przekazania i dziennik sesji
 
 **Na 2026-09-09:** wszystkie zadania pozostają OTWARTE. Utworzono dokumentację; nie wprowadzono korekt kodu, nie wykonano buildów bibliotek ani publikacji. Nie uznawaj samego dodania ISSUES.md za realizację żadnego zadania.
@@ -319,3 +355,4 @@ Po kolejnej sesji dopisz wiersz i uzupełnij statusy odpowiednich zadań. Zapisz
 | 2026-09-09 / punkt odniesienia powyżej | Wszystkie: OTWARTE | Utworzenie planu korekt | Inspekcja statyczna; testów bibliotek nie uruchomiono | Rozpocząć od wskazanego P1 |
 | 2026-09-10 / commit dodający ten wpis; checkpoint 70d3513 | TRACE-001–TRACE-006: GOTOWE lokalnie | Korekty nearest/slab/hash, kontrakty obwiedni/zasłaniania/porządku, README/API, dependency snapshots, wersja 2.0.0-SNAPSHOT, CI i pakowanie | Bazowe 43 PASS; pierwsze regresje 2 FAIL + 1 ERROR, małe składowe 2 FAIL; końcowe clean verify 62 + 2 PASS. javap 19 typów/138 deklaracji bez usunięć; actionlint PASS. Pełne wersje, SHA i logi opisane w VERIFICATION.md | Udostępnić docelowe zależności dla hosted CI, uruchomić CI, przed wydaniem zweryfikować nowe współrzędne/tag/destynacje. Nie wykonywano push/deploy ani zmian w innych bibliotekach |
 | 2026-09-10 / commit rozszerzenia; checkpoint 5356ab5, baza 3be89a0 | TRACE-007–009 GOTOWE; TRACE-010 ZABLOKOWANE zależnościami zdalnego CI | Mapowana siatka, wejście/wyjście geometrii, first/last/any, bufor, cztery przykłady i skrypt odtwarzania buildu | Pierwsza kompilacja nowych testów: błędny import SquareXZChunkScheme, poprawiony na pakiet implementation. Następnie 82 PASS; końcowe JDK 21 i 25: po 85 + 2 PASS. javap i zgodność starego klienta PASS; actionlint PASS. Pomiar alokacji zapisany w VERIFICATION.md | Udostępnić zweryfikowane zależności i uruchomić hosted CI przed wydaniem; brak push/deploy i zmian poza Ashtrace |
+| 2026-09-10 / commit integracji; checkpoint 8d70f81 | TRACE-011 GOTOWE; SPACE-011 poprawiony w f652173 po rozszerzeniu zgody | 12 scenariuszy integracyjnych, 54 niezmienione testy zależności, walidacja zaniku współrzędnych i nowy manifest Ashspace | Przed poprawką: 53/54 oryginalnych testów PASS, regresja Ashtrace FAIL, regresje Ashspace 3/7 FAIL. Po poprawce: JDK 21 i 25 po 97 + 2 + 54 PASS; Ashspace JDK 21: 74 + 2 PASS. Publiczne API zachowane | Zdalne CI/publikacja nadal niewykonane; nowe zależności wymagają dystrybucji |

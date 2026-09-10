@@ -339,6 +339,10 @@ includes X=-0.2. The `forGrid(mapper, ...)` factories use the mapper's frame, gr
 cell size. Convert the ray to that frame, subtract the grid origin and divide position and distance
 by cell size for traversal; results convert distances back to world units. Integer result coordinates
 and occupancy arguments belong to the mapped grid. Its chunk scheme does not change voxel geometry.
+The traverser receives a ray in unit cell coordinates. Configure `VoxelTraversers.clipped` bounds
+in those cell coordinates too; a world-space clipping box needs conversion before configuration.
+Mapped tracing rejects a nonzero origin offset that divides to zero, as well as unrepresentable
+distance limits, before querying occupancy. This avoids silently moving the ray onto a cell boundary.
 Spatial hash `cellSize` controls the object index independently. Rigid frame transforms have no scale or shear.
 World conventions follow Ashspace: right-handed, Y up. Rays are normalized; `t` and `tMax` measure
 world distance, including after rigid rotation/translation. Segment limits use their length.
@@ -346,6 +350,8 @@ world distance, including after rigid rotation/translation. Segment limits use t
 With the tested `dda` provider, voxels cover `[0,tMax)` and exact ties step X, then Y, then Z,
 including zero-length intermediate visits. DDA does not visit every cell touched at an edge/corner;
 it is not supercover. Another traverser can change the occluder selected at a tie.
+Ashtrace follows Ashgrid `Raycast` by checking the starting cell. Ashgrid `LineOfSight` deliberately
+skips that cell, so its result can differ when the ray starts inside an occupied cell.
 Object bounds use closed `[0,limit]`, where `limit` is the first occupied voxel's entry or `tMax`:
 
 | Case | Result |
@@ -473,6 +479,13 @@ The release must retain these API/ordering contracts or explicitly version a cha
 serialized wire format or cross-version deterministic-stream compatibility promise. Existing 1.0.0
 artifacts must not be overwritten. [VERIFICATION.md](VERIFICATION.md) records the actual JAR identities,
 checks, publishing routes and remaining release prerequisites.
+
+To also run the selected original Ashcore/Ashgrid/Ashspace tests, use
+`./scripts/verify-blackframe-tests.ps1 -DependencyRoot ../` with the verified artifacts present.
+It first verifies Ashtrace, then copies the selected test files unchanged into a separate project
+under `.verification/blackframe-tests`, using Ashtrace's dependency and test-tool versions.
+Source hashes are checked before/after execution; no sibling build is performed by this script.
+The selection is listed in `scripts/blackframe-contract-tests.json`. See VERIFICATION.md for results.
 
 ## License
 
