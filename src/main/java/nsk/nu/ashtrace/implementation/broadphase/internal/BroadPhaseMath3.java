@@ -2,7 +2,6 @@ package nsk.nu.ashtrace.implementation.broadphase.internal;
 
 import nsk.nu.ashcore.api.geometry.AxisAlignedBox;
 import nsk.nu.ashcore.api.geometry.Ray;
-import nsk.nu.ashcore.api.math.NumericTolerance;
 import nsk.nu.ashcore.api.math.Vector3;
 
 public final class BroadPhaseMath3 {
@@ -66,7 +65,7 @@ public final class BroadPhaseMath3 {
             double targetMax = component(targetBounds.max(), axis);
             double motion = component(delta, axis);
 
-            if (Math.abs(motion) <= NumericTolerance.GEOMETRY_EPS) {
+            if (motion == 0.0) {
                 if (movingMax < targetMin || movingMin > targetMax) return null;
                 continue;
             }
@@ -98,6 +97,12 @@ public final class BroadPhaseMath3 {
         }
     }
 
+    public static void requireFiniteBounds(AxisAlignedBox bounds, String name) {
+        if (bounds == null) throw new NullPointerException(name);
+        requireFiniteVector(bounds.min(), name + ".min");
+        requireFiniteVector(bounds.max(), name + ".max");
+    }
+
     public static Interval rayBoxInterval(Ray ray, AxisAlignedBox box, double tMax) {
         double tEnter = Double.NEGATIVE_INFINITY;
         double tExit = Double.POSITIVE_INFINITY;
@@ -108,14 +113,13 @@ public final class BroadPhaseMath3 {
             double min = component(box.min(), axis);
             double max = component(box.max(), axis);
 
-            if (Math.abs(d) <= NumericTolerance.GEOMETRY_EPS) {
+            if (d == 0.0) {
                 if (o < min || o > max) return null;
                 continue;
             }
 
-            double inv = 1.0 / d;
-            double t0 = (min - o) * inv;
-            double t1 = (max - o) * inv;
+            double t0 = (min - o) / d;
+            double t1 = (max - o) / d;
             if (t0 > t1) {
                 double tmp = t0;
                 t0 = t1;

@@ -22,6 +22,9 @@ import java.util.function.Consumer;
  * Static BVH broad-phase over AABBs.
  *
  * <p>Build is deterministic for the same input order. Query output order is deterministic but not insertion-based.</p>
+ * <p>AABB/sphere queries visit left then right in the built tree. Ray/sweep intervals sort by
+ * entry, exit, then original input position. Nearest visits the nearer child first (left on a tie)
+ * and retains the first equal-distance leaf entry. This tie rule can differ from a linear scan.</p>
  */
 public final class BvhAabbBroadPhase3<T> implements
         BroadPhase3<T>,
@@ -40,6 +43,7 @@ public final class BvhAabbBroadPhase3<T> implements
         for (int i = 0; i < entries.size(); i++) {
             AabbEntry3<T> entry = entries.get(i);
             if (entry == null) throw new NullPointerException("entries[" + i + "]");
+            BroadPhaseMath3.requireFiniteBounds(entry.bounds(), "bounds");
             indexed.add(new IndexedEntry<>(entry, i, centroid(entry.bounds())));
         }
         this.ordered = indexed;
@@ -55,7 +59,7 @@ public final class BvhAabbBroadPhase3<T> implements
 
     @Override
     public void query(AxisAlignedBox queryBounds, Consumer<T> consumer) {
-        if (queryBounds == null) throw new NullPointerException("queryBounds");
+        BroadPhaseMath3.requireFiniteBounds(queryBounds, "queryBounds");
         if (consumer == null) throw new NullPointerException("consumer");
         if (root == null) return;
         query(root, queryBounds, consumer);
@@ -164,6 +168,7 @@ public final class BvhAabbBroadPhase3<T> implements
             for (int i = node.start; i < node.end; i++) {
                 AabbEntry3<T> entry = ordered.get(i).entry;
                 double distanceSquared = BroadPhaseMath3.distanceSquaredToBox(point, entry.bounds());
+                if (distanceSquared > nearest.distanceSquared) continue;
                 if (nearest.value == null || distanceSquared < nearest.distanceSquared) {
                     nearest.distanceSquared = distanceSquared;
                     nearest.value = entry.value();
@@ -190,7 +195,7 @@ public final class BvhAabbBroadPhase3<T> implements
             Vector3 delta,
             Consumer<BroadPhaseSweepHit3<T>> consumer
     ) {
-        if (movingBounds == null) throw new NullPointerException("movingBounds");
+        BroadPhaseMath3.requireFiniteBounds(movingBounds, "movingBounds");
         BroadPhaseMath3.requireFiniteVector(delta, "delta");
         if (consumer == null) throw new NullPointerException("consumer");
         if (root == null) return;

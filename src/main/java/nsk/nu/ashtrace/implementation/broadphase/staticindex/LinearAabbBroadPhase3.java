@@ -19,7 +19,9 @@ import java.util.Comparator;
 import java.util.function.Consumer;
 
 /**
- * Allocation-light broad-phase baseline using deterministic linear scan.
+ * Broad-phase baseline using a deterministic linear scan of a copied entry list.
+ * AABB, ray and sphere emissions follow input order; nearest keeps the first equal-distance entry.
+ * Sweeps sort by entry time, exit time, then input position. Payloads are retained by reference.
  */
 public final class LinearAabbBroadPhase3<T> implements
         BroadPhase3<T>,
@@ -32,6 +34,7 @@ public final class LinearAabbBroadPhase3<T> implements
         if (entries == null) throw new NullPointerException("entries");
         for (int i = 0; i < entries.size(); i++) {
             if (entries.get(i) == null) throw new NullPointerException("entries[" + i + "]");
+            BroadPhaseMath3.requireFiniteBounds(entries.get(i).bounds(), "bounds");
         }
         this.entries = List.copyOf(entries);
     }
@@ -52,7 +55,7 @@ public final class LinearAabbBroadPhase3<T> implements
 
     @Override
     public void query(AxisAlignedBox queryBounds, Consumer<T> consumer) {
-        if (queryBounds == null) throw new NullPointerException("queryBounds");
+        BroadPhaseMath3.requireFiniteBounds(queryBounds, "queryBounds");
         if (consumer == null) throw new NullPointerException("consumer");
         for (AabbEntry3<T> entry : entries) {
             if (BroadPhaseMath3.intersects(queryBounds, entry.bounds())) {
@@ -118,7 +121,7 @@ public final class LinearAabbBroadPhase3<T> implements
             Vector3 delta,
             Consumer<BroadPhaseSweepHit3<T>> consumer
     ) {
-        if (movingBounds == null) throw new NullPointerException("movingBounds");
+        BroadPhaseMath3.requireFiniteBounds(movingBounds, "movingBounds");
         BroadPhaseMath3.requireFiniteVector(delta, "delta");
         if (consumer == null) throw new NullPointerException("consumer");
 

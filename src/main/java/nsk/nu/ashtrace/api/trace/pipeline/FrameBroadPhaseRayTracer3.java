@@ -2,7 +2,6 @@ package nsk.nu.ashtrace.api.trace.pipeline;
 
 import nsk.nu.ashcore.api.geometry.Ray;
 import nsk.nu.ashcore.api.geometry.Segment3;
-import nsk.nu.ashcore.api.math.Vector3;
 import nsk.nu.ashspace.api.frame.FrameGraph3;
 import nsk.nu.ashspace.api.frame.FrameId;
 import nsk.nu.ashspace.api.space.SpaceConverter3;
@@ -16,6 +15,15 @@ import java.util.List;
 
 /**
  * Frame-aware tracing pipeline over broad-phase ray/segment candidates.
+ * Accepts indexed AABBs, without computing exact enclosed-surface distances. Results sort by
+ * AABB {@code tEnter}, then {@code tExit}, then broad-phase emission order for full ties.
+ * The graph, index, payload geometry and callback state must remain stable throughout a query;
+ * callbacks must not mutate them. No snapshots or synchronization are supplied by this tracer.
+ * Result lists are immutable snapshots retaining payload references.
+ *
+ * <p>With C emitted candidates, Q broad-phase work and F total acceptance-callback cost,
+ * even first-hit and limited queries cost O(Q + C log C + F), plus frame conversion.
+ * All candidates are collected before filtering; temporary storage is O(C).</p>
  */
 public final class FrameBroadPhaseRayTracer3<T> {
     private final FrameGraph3 frames;
@@ -25,7 +33,10 @@ public final class FrameBroadPhaseRayTracer3<T> {
     @FunctionalInterface
     public interface NarrowPhase3<T> {
         /**
-         * @return true when candidate should be accepted as final hit
+         * Tests an AABB candidate on the closed, query-clipped interval in world-distance units.
+         * A geometric test must restrict its surface check to this interval, especially under voxel clipping.
+         * Returning true does not replace the AABB interval or point with an exact surface result.
+         * @return true to accept this bounds candidate; false to reject it
          */
         boolean test(T value, Ray worldRay, double tEnter, double tExit);
     }
@@ -53,7 +64,8 @@ public final class FrameBroadPhaseRayTracer3<T> {
     }
 
     /**
-     * Trace first accepted hit for a source-frame ray.
+     * Return the first accepted AABB in the documented interval order, or null.
+     * This need not be the nearest enclosed surface. At tMax=0, bounds containing the origin can match.
      * {@code tMax} is a finite world-space distance along the normalized world ray.
      */
     public TraceHit3<T> firstHit(
@@ -82,7 +94,7 @@ public final class FrameBroadPhaseRayTracer3<T> {
     }
 
     /**
-     * Trace all accepted hits for a source-frame ray.
+     * Return all accepted AABB intervals in the documented order, or an empty immutable list.
      * {@code tMax} is a finite world-space distance along the normalized world ray.
      */
     public List<TraceHit3<T>> allHits(
@@ -95,7 +107,7 @@ public final class FrameBroadPhaseRayTracer3<T> {
     }
 
     /**
-     * Trace accepted hits for a source-frame ray up to {@code maxHits}.
+     * Return at most {@code maxHits} accepted AABB intervals; stop acceptance callbacks at that count.
      * {@code tMax} is a finite world-space distance along the normalized world ray.
      */
     public List<TraceHit3<T>> allHits(
@@ -129,7 +141,7 @@ public final class FrameBroadPhaseRayTracer3<T> {
     }
 
     /**
-     * Trace first accepted hit for a source-frame segment.
+     * Trace the first accepted AABB along a closed segment; zero or non-finite length is rejected.
      */
     public TraceHit3<T> firstSegmentHit(
             FrameId sourceFrame,

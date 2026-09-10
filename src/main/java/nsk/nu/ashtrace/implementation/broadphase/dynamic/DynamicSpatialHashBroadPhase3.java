@@ -21,10 +21,17 @@ import java.util.function.Consumer;
  * Mutable spatial-hash broad-phase for dynamic scenes.
  *
  * <p>Entries are indexed into fixed-size hash cells. Queries are deterministic for the same insertion/update sequence.</p>
+ * <p>AABB/sphere queries emit ascending handles. Ray/sweep queries sort by entry time, exit time,
+ * then handle. Nearest scans surviving insertion order and keeps the first equal-distance entry.
+ * Updates retain handles; reinsertion appends. Queries and callbacks must not mutate the index.</p>
+ *
+ * <p>Cell membership is floor(coordinate / cellSize), including both AABB endpoints. Cell indices
+ * must fit signed int; each enumerated range must contain at most Integer.MAX_VALUE cells.
+ * Callers must impose smaller workload/memory budgets as needed. Invalid ranges are rejected before
+ * insert/update changes the index. This cell size only configures the index, not voxel tracing.</p>
  */
 public final class DynamicSpatialHashBroadPhase3<T> implements MutableRayBroadPhase3<T> {
     private final double cellSize;
-    private final double invCellSize;
     private final Map<Long, Entry<T>> entries = new LinkedHashMap<>();
     private final Map<CellKey, ArrayList<Long>> buckets = new HashMap<>();
     private long nextHandle = 1L;
@@ -34,7 +41,6 @@ public final class DynamicSpatialHashBroadPhase3<T> implements MutableRayBroadPh
             throw new IllegalArgumentException("cellSize must be finite and > 0");
         }
         this.cellSize = cellSize;
-        this.invCellSize = 1.0 / cellSize;
     }
 
     /**
@@ -46,24 +52,27 @@ public final class DynamicSpatialHashBroadPhase3<T> implements MutableRayBroadPh
 
     @Override
     public long insert(AxisAlignedBox bounds, T value) {
-        if (bounds == null) throw new NullPointerException("bounds");
+        BroadPhaseMath3.requireFiniteBounds(bounds, "bounds");
         if (value == null) throw new NullPointerException("value");
+        IndexRange range = range(bounds);
+        if (nextHandle <= 0L) throw new IllegalStateException("handle space exhausted");
 
         long handle = nextHandle++;
         Entry<T> entry = new Entry<>(handle, bounds, value);
         entries.put(handle, entry);
-        register(entry);
+        register(entry, range);
         return handle;
     }
 
     @Override
     public boolean updateBounds(long handle, AxisAlignedBox bounds) {
-        if (bounds == null) throw new NullPointerException("bounds");
+        BroadPhaseMath3.requireFiniteBounds(bounds, "bounds");
         Entry<T> entry = entries.get(handle);
         if (entry == null) return false;
+        IndexRange range = range(bounds);
         unregister(entry);
         entry.bounds = bounds;
-        register(entry);
+        register(entry, range);
         return true;
     }
 
@@ -88,7 +97,7 @@ public final class DynamicSpatialHashBroadPhase3<T> implements MutableRayBroadPh
 
     @Override
     public void query(AxisAlignedBox queryBounds, Consumer<T> consumer) {
-        if (queryBounds == null) throw new NullPointerException("queryBounds");
+        BroadPhaseMath3.requireFiniteBounds(queryBounds, "queryBounds");
         if (consumer == null) throw new NullPointerException("consumer");
 
         for (long handle : collectCandidateHandles(queryBounds)) {
@@ -179,7 +188,7 @@ public final class DynamicSpatialHashBroadPhase3<T> implements MutableRayBroadPh
             Vector3 delta,
             Consumer<BroadPhaseSweepHit3<T>> consumer
     ) {
-        if (movingBounds == null) throw new NullPointerException("movingBounds");
+        BroadPhaseMath3.requireFiniteBounds(movingBounds, "movingBounds");
         BroadPhaseMath3.requireFiniteVector(delta, "delta");
         if (consumer == null) throw new NullPointerException("consumer");
 
@@ -206,13 +215,12 @@ public final class DynamicSpatialHashBroadPhase3<T> implements MutableRayBroadPh
         }
     }
 
-    private void register(Entry<T> entry) {
+    private void register(Entry<T> entry, IndexRange r) {
         entry.cells.clear();
-        IndexRange r = range(entry.bounds);
-        for (int z = r.minZ; z <= r.maxZ; z++) {
-            for (int y = r.minY; y <= r.maxY; y++) {
-                for (int x = r.minX; x <= r.maxX; x++) {
-                    CellKey key = new CellKey(x, y, z);
+        for (long z = r.minZ; z <= r.maxZ; z++) {
+            for (long y = r.minY; y <= r.maxY; y++) {
+                for (long x = r.minX; x <= r.maxX; x++) {
+                    CellKey key = new CellKey((int) x, (int) y, (int) z);
                     buckets.computeIfAbsent(key, k -> new ArrayList<>()).add(entry.handle);
                     entry.cells.add(key);
                 }
@@ -236,10 +244,10 @@ public final class DynamicSpatialHashBroadPhase3<T> implements MutableRayBroadPh
         IndexRange r = range(queryBounds);
         HashSet<Long> unique = new HashSet<>();
 
-        for (int z = r.minZ; z <= r.maxZ; z++) {
-            for (int y = r.minY; y <= r.maxY; y++) {
-                for (int x = r.minX; x <= r.maxX; x++) {
-                    ArrayList<Long> handles = buckets.get(new CellKey(x, y, z));
+        for (long z = r.minZ; z <= r.maxZ; z++) {
+            for (long y = r.minY; y <= r.maxY; y++) {
+                for (long x = r.minX; x <= r.maxX; x++) {
+                    ArrayList<Long> handles = buckets.get(new CellKey((int) x, (int) y, (int) z));
                     if (handles == null) continue;
                     unique.addAll(handles);
                 }
@@ -252,7 +260,7 @@ public final class DynamicSpatialHashBroadPhase3<T> implements MutableRayBroadPh
     }
 
     private IndexRange range(AxisAlignedBox bounds) {
-        return new IndexRange(
+        IndexRange range = new IndexRange(
                 toIndex(bounds.min().x()),
                 toIndex(bounds.min().y()),
                 toIndex(bounds.min().z()),
@@ -260,10 +268,21 @@ public final class DynamicSpatialHashBroadPhase3<T> implements MutableRayBroadPh
                 toIndex(bounds.max().y()),
                 toIndex(bounds.max().z())
         );
+        long nx = (long) range.maxX - range.minX + 1L;
+        long ny = (long) range.maxY - range.minY + 1L;
+        long nz = (long) range.maxZ - range.minZ + 1L;
+        if (nx > Integer.MAX_VALUE || ny > Integer.MAX_VALUE / nx || nz > Integer.MAX_VALUE / (nx * ny)) {
+            throw new IllegalArgumentException("hash range contains too many cells");
+        }
+        return range;
     }
 
     private int toIndex(double value) {
-        return (int) Math.floor(value * invCellSize);
+        double index = Math.floor(value / cellSize);
+        if (!Double.isFinite(index) || index < Integer.MIN_VALUE || index > Integer.MAX_VALUE) {
+            throw new IllegalArgumentException("hash cell index must fit in int");
+        }
+        return (int) index;
     }
 
     private record CellKey(int x, int y, int z) {

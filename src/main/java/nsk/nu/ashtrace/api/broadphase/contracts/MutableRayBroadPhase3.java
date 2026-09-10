@@ -4,6 +4,10 @@ import nsk.nu.ashcore.api.geometry.AxisAlignedBox;
 
 /**
  * Mutable broad-phase contract for dynamic scenes.
+ * Handles are monotonically increasing positive IDs, never reused by remove or clear.
+ * Updates retain the handle and insertion position; removal and reinsertion create a new position.
+ * Implementations reject handle exhaustion rather than wrap. All operations require external
+ * synchronization when shared, including queries and lazy snapshot rebuilds.
  */
 public interface MutableRayBroadPhase3<T> extends
         RayQueryableBroadPhase3<T>,

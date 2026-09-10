@@ -22,6 +22,8 @@ import java.util.function.Consumer;
  *
  * <p>Mutations are cheap and only mark snapshot as dirty. The next query rebuilds the snapshot
  * with deterministic BVH build cost.</p>
+ * <p>Snapshots use surviving insertion order; updates retain it, reinsertion appends. Queries inherit
+ * the static BVH's ordering. No snapshot or query is thread-safe without external synchronization.</p>
  */
 public final class DynamicBvhBroadPhase3<T> implements MutableRayBroadPhase3<T> {
     private final Map<Long, Entry<T>> entries = new LinkedHashMap<>();
@@ -31,8 +33,9 @@ public final class DynamicBvhBroadPhase3<T> implements MutableRayBroadPhase3<T> 
 
     @Override
     public long insert(AxisAlignedBox bounds, T value) {
-        if (bounds == null) throw new NullPointerException("bounds");
+        BroadPhaseMath3.requireFiniteBounds(bounds, "bounds");
         if (value == null) throw new NullPointerException("value");
+        if (nextHandle <= 0L) throw new IllegalStateException("handle space exhausted");
 
         long handle = nextHandle++;
         entries.put(handle, new Entry<>(handle, bounds, value));
@@ -42,7 +45,7 @@ public final class DynamicBvhBroadPhase3<T> implements MutableRayBroadPhase3<T> 
 
     @Override
     public boolean updateBounds(long handle, AxisAlignedBox bounds) {
-        if (bounds == null) throw new NullPointerException("bounds");
+        BroadPhaseMath3.requireFiniteBounds(bounds, "bounds");
         Entry<T> entry = entries.get(handle);
         if (entry == null) return false;
         entry.bounds = bounds;
@@ -71,7 +74,7 @@ public final class DynamicBvhBroadPhase3<T> implements MutableRayBroadPhase3<T> 
 
     @Override
     public void query(AxisAlignedBox queryBounds, Consumer<T> consumer) {
-        if (queryBounds == null) throw new NullPointerException("queryBounds");
+        BroadPhaseMath3.requireFiniteBounds(queryBounds, "queryBounds");
         if (consumer == null) throw new NullPointerException("consumer");
 
         ensureSnapshot();
@@ -123,7 +126,7 @@ public final class DynamicBvhBroadPhase3<T> implements MutableRayBroadPhase3<T> 
             Vector3 delta,
             Consumer<BroadPhaseSweepHit3<T>> consumer
     ) {
-        if (movingBounds == null) throw new NullPointerException("movingBounds");
+        BroadPhaseMath3.requireFiniteBounds(movingBounds, "movingBounds");
         BroadPhaseMath3.requireFiniteVector(delta, "delta");
         if (consumer == null) throw new NullPointerException("consumer");
 

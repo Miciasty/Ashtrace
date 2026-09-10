@@ -23,6 +23,8 @@ public interface ProximityQueryableBroadPhase3<T> extends BroadPhase3<T> {
      *
      * <p>{@code maxDistance} is in world-space units and is inclusive.
      * Returned distance is squared Euclidean distance in world-space units squared.</p>
+     * <p>Distance is to the closed AABB (zero inside), not its enclosed object's surface.
+     * Returns null if no entry is within the limit. Equal-distance winners are implementation-specific.</p>
      */
     BroadPhaseNearestHit3<T> nearest(Vector3 point, double maxDistance);
 }

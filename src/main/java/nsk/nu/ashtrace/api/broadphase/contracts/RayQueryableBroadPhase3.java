@@ -19,6 +19,8 @@ public interface RayQueryableBroadPhase3<T> extends BroadPhase3<T> {
      *
      * <p>Each emitted hit uses boundary-inclusive interval {@code [tEnter, tExit]} where
      * both values are in world-space distance units from {@code ray.origin()}.</p>
+     * <p>At tMax=0, boxes containing the origin match with [0,0]. Neither zero nor very small
+     * nonzero direction components are replaced by a tolerance. Ordering is implementation-specific.</p>
      */
     void queryRay(Ray ray, double tMax, Consumer<BroadPhaseRayHit3<T>> consumer);
 

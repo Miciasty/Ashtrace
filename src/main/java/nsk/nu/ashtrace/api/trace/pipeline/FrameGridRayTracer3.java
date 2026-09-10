@@ -15,6 +15,13 @@ import java.util.List;
 
 /**
  * Frame-aware voxel ray tracing pipeline built on Ashspace and Ashgrid.
+ * Voxels are unit world cells rooted at zero, indexed by floor (including negative coordinates).
+ * No cell-size or origin mapper is inferred. Parameters are world distances after rigid conversion.
+ * The supplied traverser owns cell/tie ordering; the DDA provider visits [0,tMax), including
+ * starting-cell and boundary tie visits, but visits nothing when tMax=0.
+ * Zero-length segments are rejected. Keep frames, occupancy and traverser configuration stable
+ * throughout a query, including callbacks; this tracer neither locks nor snapshots them.
+ * Returned lists are immutable and hit coordinates/points do not track subsequent changes.
  */
 public final class FrameGridRayTracer3 {
     private final FrameGraph3 frames;

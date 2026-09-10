@@ -50,7 +50,7 @@ Maven używa zależności rozstrzygniętych z POM i repozytoriów artefaktów. Z
 
 ## TRACE-001 — Rozdzielić zaakceptowaną obwiednię od dokładnego trafienia
 
-**Status:** OTWARTE  
+**Status:** GOTOWE
 **Priorytet:** P1  
 **Dowód:** INSPEKCJA  
 **Kontrakt:** sekcje 3.4, 4.2, 5
@@ -65,17 +65,19 @@ Maven używa zależności rozstrzygniętych z POM i repozytoriów artefaktów. Z
 
 **Warunki zamknięcia:**
 
-- [ ] Scenariusz dwóch obiektów, gdzie AABB obiektu A zaczyna się wcześniej, ale jego powierzchnia leży dalej niż powierzchnia B, rozróżnia kolejność obwiedni od rzeczywistych trafień.
-- [ ] Dokumentacja jednoznacznie wyjaśnia tEnter, hitPoint i firstHit. Ewentualne dokładne API wybiera i sortuje po dokładnym parametrze.
-- [ ] Zmiana ma plan zgodności dla obecnego NarrowPhase3 i TraceHit3 oraz testy zaakceptowania/odrzucenia kandydatów.
+- [x] Scenariusz dwóch obiektów, gdzie AABB obiektu A zaczyna się wcześniej, ale jego powierzchnia leży dalej niż powierzchnia B, rozróżnia kolejność obwiedni od rzeczywistych trafień.
+- [x] Dokumentacja jednoznacznie wyjaśnia tEnter, hitPoint i firstHit. Ewentualne dokładne API wybiera i sortuje po dokładnym parametrze.
+- [x] Zmiana ma plan zgodności dla obecnego NarrowPhase3 i TraceHit3 oraz testy zaakceptowania/odrzucenia kandydatów.
 
 **Powiązania:** [TRACE-002](../Ashtrace/ISSUES.md#trace-002) dotyczy zasłaniania; reguły primitive intersection w [CORE-004](../Ashcore/ISSUES.md#core-004). Dokładny interfejs nie wymaga wdrożenia całego silnika fizyki.
+
+**Wynik 2026-09-10:** Zachowano boolean NarrowPhase3 i AABB-owe znaczenie TraceHit3, bez zmiany sygnatur. CandidateSemanticsTest rozróżnia wcześniejszą obwiednię A i bliższą powierzchnię B, sprawdza akceptację/odrzucenie oraz niemutowalność listy. README/Javadoc opisują firstHit, tEnter/tExit i worldPoint. PASS w końcowym clean verify; migracja w VERIFICATION.md.
 
 <a id="trace-002"></a>
 
 ## TRACE-002 — Sprawdzić zasłanianie, jednostki i końce przedziałów
 
-**Status:** OTWARTE  
+**Status:** GOTOWE
 **Priorytet:** P1  
 **Dowód:** AUDYT  
 **Kontrakt:** sekcje 3.4, 4.2, 4.3, 4.5
@@ -90,17 +92,19 @@ Maven używa zależności rozstrzygniętych z POM i repozytoriów artefaktów. Z
 
 **Warunki zamknięcia:**
 
-- [ ] Testy rozstrzygają równe granice, pusty odcinek, początki wewnątrz, brak zasłony i ujemne kierunki; wskazują wersję Ashgrid z poprawką [GRID-001](../Ashgrid/ISSUES.md#grid-001).
-- [ ] Dokumentacja określa, czy visible dotyczy obwiedni czy dokładnego przecięcia i jak callback ma przestrzegać przyciętego przedziału.
-- [ ] Jednostki t, model siatki i wymaganie stabilnych ramek są jawne; zmiana cellSize nie jest zakładana automatycznie przez tracer.
+- [x] Testy rozstrzygają równe granice, pusty odcinek, początki wewnątrz, brak zasłony i ujemne kierunki; wskazują wersję Ashgrid z poprawką [GRID-001](../Ashgrid/ISSUES.md#grid-001).
+- [x] Dokumentacja określa, czy visible dotyczy obwiedni czy dokładnego przecięcia i jak callback ma przestrzegać przyciętego przedziału.
+- [x] Jednostki t, model siatki i wymaganie stabilnych ramek są jawne; zmiana cellSize nie jest zakładana automatycznie przez tracer.
 
 **Powiązania:** [GRID-001](../Ashgrid/ISSUES.md#grid-001) oraz [GRID-002](../Ashgrid/ISSUES.md#grid-002), [CORE-001](../Ashcore/ISSUES.md#core-001) oraz [CORE-004](../Ashcore/ISSUES.md#core-004) i [SPACE-002](../Ashspace/ISSUES.md#space-002) oraz [SPACE-004](../Ashspace/ISSUES.md#space-004). Nie maskuj defektu DDA w Ashtrace.
+
+**Wynik 2026-09-10:** CandidateSemanticsTest odtworzył problem ujemnego kierunku na Ashgrid 1.2.0; po przejściu na konkretny JAR 1.3.0-SNAPSHOT testy PASS. Zachowano kontakt domknięty na wejściu w ścianę i przy początku w przeszkodzie; tMax=0 nie odwiedza wokseli, zerowy segment jest odrzucany. Testy obejmują brak zasłony, oba kierunki, przycięty callback, granicę tMax oraz przesunięcie/obrót z zamrożonym grafem. Jednostkowa siatka world i stabilny stan są jawne. Hashe Ashcore/Ashgrid/Ashspace zapisano w VERIFICATION.md; dolnych bibliotek nie zmieniono.
 
 <a id="trace-003"></a>
 
 ## TRACE-003 — Ustalić stabilną kolejność wyników indeksów
 
-**Status:** OTWARTE  
+**Status:** GOTOWE
 **Priorytet:** P1  
 **Dowód:** AUDYT  
 **Kontrakt:** sekcje 4.1, 4.2, 4.5
@@ -115,17 +119,19 @@ Maven używa zależności rozstrzygniętych z POM i repozytoriów artefaktów. Z
 
 **Warunki zamknięcia:**
 
-- [ ] Testy zgodności indeksów sprawdzają deklarowane wspólne własności dla AABB/ray/sphere/nearest/sweep.
-- [ ] Testy powtarzalności obejmują sekwencje mutacji, identyczne obwiednie i remisy; dowolną kolejność insertów testuje się jako gwarancję tylko po jej przyjęciu.
-- [ ] Zapisano zakres thread-safety i zakaz lub model mutacji indeksu podczas callbacku.
+- [x] Testy zgodności indeksów sprawdzają deklarowane wspólne własności dla AABB/ray/sphere/nearest/sweep.
+- [x] Testy powtarzalności obejmują sekwencje mutacji, identyczne obwiednie i remisy; dowolną kolejność insertów testuje się jako gwarancję tylko po jej przyjęciu.
+- [x] Zapisano zakres thread-safety i zakaz lub model mutacji indeksu podczas callbacku.
 
 **Powiązania:** [TRACE-001](../Ashtrace/ISSUES.md#trace-001) i ustalenia deterministyczne [CORE-002](../Ashcore/ISSUES.md#core-002); bez wymagania produkcyjnej zależności od nowych bibliotek.
+
+**Wynik 2026-09-10:** Zachowano porządek per implementacja, bez obietnicy niezależności od insertów. BroadPhaseAgreementTest porównuje zbiory/parametry pięciu rodzin zapytań, BroadPhaseOrderingTest remisy oraz update/remove/reinsert/clear i przebudowy BVH. Naprawiono odtworzony błąd maxDistance w liściach BVH oraz zerowanie małych składowych promienia/ruchu. SpatialHashLimitsTest sprawdza granice int, subnormalny cellSize i niezmienność indeksu po odrzuceniu zakresu. README/Javadoc określają brak thread-safety indeksów mutable i zakaz mutacji w callbackach. Wszystkie testy PASS.
 
 <a id="trace-004"></a>
 
 ## TRACE-004 — Skorygować opis kosztu sortowania i pracy indeksów
 
-**Status:** OTWARTE  
+**Status:** GOTOWE
 **Priorytet:** P1  
 **Dowód:** INSPEKCJA  
 **Kontrakt:** sekcje 4.4, 5.1
@@ -140,17 +146,19 @@ Maven używa zależności rozstrzygniętych z POM i repozytoriów artefaktów. Z
 
 **Warunki zamknięcia:**
 
-- [ ] Tabela jawnie obejmuje sortowanie i pamięć kandydatów; q/m/C są zdefiniowane bez ukrywania pracy.
-- [ ] Rozdzielono aktualizację, pierwsze zapytanie po mutacji i kolejne odczyty oraz wskazano przypadki najgorsze.
-- [ ] Jeśli dodano optymalizację, pomiar reprezentatywnego przypadku i testy semantyki/remisów potwierdzają efekt.
+- [x] Tabela jawnie obejmuje sortowanie i pamięć kandydatów; q/m/C są zdefiniowane bez ukrywania pracy.
+- [x] Rozdzielono aktualizację, pierwsze zapytanie po mutacji i kolejne odczyty oraz wskazano przypadki najgorsze.
+- [x] Jeśli dodano optymalizację, pomiar reprezentatywnego przypadku i testy semantyki/remisów potwierdzają efekt.
 
 **Powiązania:** [NAV-005](../Ashnav/ISSUES.md#nav-005) ma podobny temat rzetelnej złożoności, ale wymaga osobnej analizy właściwej dla grafów.
+
+**Wynik 2026-09-10:** Tabela README i Javadoc pipeline opisują Q + C log C + F, wszystkie listy kandydatów, skanowanie surowych referencji hash, deduplikację/sortowanie uchwytów, liniowe usuwanie z bucketów i build + query po mutacji BVH. Rozdzielono pamięć pomocniczą, wynik i retencję indeksu; symbole są zdefiniowane. Nie optymalizowano algorytmów, więc warunek pomiaru optymalizacji nie dotyczy; nie deklarowano przyspieszenia.
 
 <a id="trace-005"></a>
 
 ## TRACE-005 — Zdefiniować wspierane implementacje i zgodność API
 
-**Status:** OTWARTE  
+**Status:** GOTOWE
 **Priorytet:** P1  
 **Dowód:** DECYZJA  
 **Kontrakt:** sekcje 5, 5.1, 8
@@ -165,17 +173,19 @@ Maven używa zależności rozstrzygniętych z POM i repozytoriów artefaktów. Z
 
 **Warunki zamknięcia:**
 
-- [ ] Oba quick starty kompilują się na docelowych zależnościach.
-- [ ] API/README są zgodne co do granicy candidate/exact i statusu implementacji.
-- [ ] Zapisano wpływ aktualizacji Ashcore/Ashgrid/Ashspace; opublikowane artefakty nie są nadpisywane.
+- [x] Oba quick starty kompilują się na docelowych zależnościach.
+- [x] API/README są zgodne co do granicy candidate/exact i statusu implementacji.
+- [x] Zapisano wpływ aktualizacji Ashcore/Ashgrid/Ashspace; opublikowane artefakty nie są nadpisywane.
 
 **Powiązania:** [CORE-006](../Ashcore/ISSUES.md#core-006), [GRID-006](../Ashgrid/ISSUES.md#grid-006), [SPACE-005](../Ashspace/ISSUES.md#space-005); brak wymogu tworzenia Ashmesh.
+
+**Wynik 2026-09-10:** Wsparcie obejmuje api oraz publiczne staticindex/dynamic, w tym konstruktor BVH; internal wyłączono jawnie. Oba kompletne przykłady README kompilują się i działają z gotowymi JAR podczas verify. javap: 19 publicznych typów/138 deklaracji, zero usunięć lub zmian. Wybrano 2.0.0-SNAPSHOT dla ostrzejszej walidacji i zależności Ashspace 2.0; starego 1.0.0 nie nadpisano. Zmiany semantyki, wersje zależności i ograniczenia porównania opisano w VERIFICATION.md.
 
 <a id="trace-006"></a>
 
 ## TRACE-006 — Dostosować CI, pakowanie i dowody wydania
 
-**Status:** OTWARTE  
+**Status:** GOTOWE
 **Priorytet:** P1  
 **Dowód:** INSPEKCJA  
 **Kontrakt:** sekcje 2, 4.5, 6
@@ -190,21 +200,24 @@ Maven używa zależności rozstrzygniętych z POM i repozytoriów artefaktów. Z
 
 **Warunki zamknięcia:**
 
-- [ ] Zapisano wynik mvn -B clean verify z wymaganymi testami oraz wersje JDK/Maven; CI obejmuje faktycznie utrzymywane gałęzie i PR-y.
-- [ ] Główny JAR, sources, Javadoc i wymagane zasoby są sprawdzone. Błędny Javadoc nie jest po cichu uznawany za poprawny; nie trzeba przy tym mechanicznie włączać każdej reguły stylistycznej doclint.
-- [ ] Wskazano używane cele publikacji, tag/wersję i dowody dostępności albo jawnie pozostawiono publikację jako niezweryfikowaną. Sam deploy nie służy jako test poprawek.
-- [ ] Sprawdzono efektywne zależności i ich scope; test integracyjny korzysta z zamierzonej wersji dolnej warstwy, a nie przypadkowej starej kopii z lokalnego Maven.
+- [x] Zapisano wynik mvn -B clean verify z wymaganymi testami oraz wersje JDK/Maven; CI obejmuje faktycznie utrzymywane gałęzie i PR-y.
+- [x] Główny JAR, sources, Javadoc i wymagane zasoby są sprawdzone. Błędny Javadoc nie jest po cichu uznawany za poprawny; nie trzeba przy tym mechanicznie włączać każdej reguły stylistycznej doclint.
+- [x] Wskazano używane cele publikacji, tag/wersję i dowody dostępności albo jawnie pozostawiono publikację jako niezweryfikowaną. Sam deploy nie służy jako test poprawek.
+- [x] Sprawdzono efektywne zależności i ich scope; test integracyjny korzysta z zamierzonej wersji dolnej warstwy, a nie przypadkowej starej kopii z lokalnego Maven.
 
 **Powiązania:** Wspólny wzorzec: [TEMPLATE-001](../Ashtemplate/ISSUES.md#template-001) i [TEMPLATE-002](../Ashtemplate/ISSUES.md#template-002). Tę korektę można wykonać niezależnie od napraw algorytmów. Istniejącego numeru wydania nie nadpisuj innym artefaktem.
+
+**Wynik 2026-09-10:** clean verify PASS: 62 + 2 testy, JDK 21.0.12.1, Maven 3.9.16, release 21. Javadoc all,-missing/failOnError=true PASS; sprawdzone dokładne main/sources/Javadoc, LICENSE/NOTICE, współrzędne i brak JUnit w main. SPI DDA sprawdzone z JAR zależności. CI obejmuje wszystkie branche i PR-y; zdalny HEAD potwierdzono jako main. Oba workflow przeszły actionlint. dependency:tree/effective-pom potwierdziły trzy zamierzone snapshoty compile i JUnit test. Zdalne CI oraz cele Packages/Release/Central pozostają jawnie niezweryfikowane; hosted runner wymaga udostępnienia zależności rozwojowych. Zamknięcie dotyczy lokalnych kryteriów korekty, nie gotowości wydania. Dowody i następne kroki: VERIFICATION.md.
 
 ## Stan przekazania i dziennik sesji
 
 **Na 2026-09-09:** wszystkie zadania pozostają OTWARTE. Utworzono dokumentację; nie wprowadzono korekt kodu, nie wykonano buildów bibliotek ani publikacji. Nie uznawaj samego dodania ISSUES.md za realizację żadnego zadania.
 
-**Sugerowany start:** [TRACE-001](../Ashtrace/ISSUES.md#trace-001) i [TRACE-002](../Ashtrace/ISSUES.md#trace-002); testy kierunków ujemnych skoordynuj z [GRID-001](../Ashgrid/ISSUES.md#grid-001).
+**Stan po korekcie 2026-09-10:** TRACE-001–TRACE-006 GOTOWE w zakresie opisanej korekty lokalnej. Wersja 2.0.0-SNAPSHOT, branch fix/ashtrace-contract-v2-20260910, checkpoint 70d3513. Końcowe clean verify: 62 testy + 2 testy artefaktów PASS. Zdalne CI i publikacja nie były wykonane; runner wymaga dostępności trzech rozwojowych zależności. Szczegóły, migracja, hashe JAR i pozostałe warunki wydania: [VERIFICATION.md](VERIFICATION.md).
 
 Po kolejnej sesji dopisz wiersz i uzupełnij statusy odpowiednich zadań. Zapisz także nieudane próby i ograniczenia środowiska; nie opisuj kontroli niewykonanej jako zaliczonej.
 
 | Data / commit | ID i decyzja | Zmiana | Polecenie / test i rzeczywisty wynik | Pozostałe zależności / następny krok |
 | --- | --- | --- | --- | --- |
 | 2026-09-09 / punkt odniesienia powyżej | Wszystkie: OTWARTE | Utworzenie planu korekt | Inspekcja statyczna; testów bibliotek nie uruchomiono | Rozpocząć od wskazanego P1 |
+| 2026-09-10 / commit dodający ten wpis; checkpoint 70d3513 | TRACE-001–TRACE-006: GOTOWE lokalnie | Korekty nearest/slab/hash, kontrakty obwiedni/zasłaniania/porządku, README/API, dependency snapshots, wersja 2.0.0-SNAPSHOT, CI i pakowanie | Bazowe 43 PASS; pierwsze regresje 2 FAIL + 1 ERROR, małe składowe 2 FAIL; końcowe clean verify 62 + 2 PASS. javap 19 typów/138 deklaracji bez usunięć; actionlint PASS. Pełne wersje, SHA i logi opisane w VERIFICATION.md | Udostępnić docelowe zależności dla hosted CI, uruchomić CI, przed wydaniem zweryfikować nowe współrzędne/tag/destynacje. Nie wykonywano push/deploy ani zmian w innych bibliotekach |

@@ -14,7 +14,22 @@ import nsk.nu.ashtrace.api.trace.model.TraceHit3;
 import java.util.List;
 
 /**
- * Frame-aware tracing pipeline that combines broad-phase object hits with voxel occlusion.
+ * Frame-aware AABB candidate tracing clipped at the first occupied world-grid voxel.
+ * "Visible" means accepted bounds intersect the clipped interval; it does not establish visibility
+ * of an enclosed surface. Acceptance callbacks must respect their supplied clipped interval.
+ *
+ * <p>Voxels are unit cells rooted at world zero, with floor-based indices on all axes.
+ * The spatial-hash cell size and Ashspace grid mappers do not configure this voxel grid.
+ * Ray parameters measure world distance after rigid frame conversion.</p>
+ *
+ * <p>Voxel traversal uses [0,tMax); object intervals use [0,limit], including contact exactly
+ * at an occluder's entry. Starting in an occupied callback cell clips to zero and can still
+ * accept bounds containing the origin. At tMax=0 there are no voxel visits, but origin bounds
+ * can match. Zero-length segment overloads are rejected.</p>
+ *
+ * <p>The frame graph is read by both tracers. Keep it, the index, occupancy and callback geometry
+ * stable for the entire call; callbacks must not mutate them. There is no locking or automatic
+ * snapshot. Traverser tie rules determine which occupied cell provides the clip.</p>
  */
 public final class FrameOccludedBroadPhaseRayTracer3<T> {
     private final FrameBroadPhaseRayTracer3<T> objectTracer;
@@ -64,6 +79,7 @@ public final class FrameOccludedBroadPhaseRayTracer3<T> {
 
     /**
      * Trace visible broad-phase hits up to {@code maxHits}, clipped by first occupied voxel.
+     * The result is immutable. All candidate acceptance callbacks run before truncating the result.
      */
     public List<TraceHit3<T>> visibleHits(
             FrameId sourceFrame,
