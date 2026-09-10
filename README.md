@@ -4,7 +4,8 @@ Ashtrace finds ray, overlap, proximity and moving-box candidates in indexed AABB
 shape intersections, and traces voxel grids attached to coordinate frames.
 
 This checkout builds **2.0.0-SNAPSHOT**, an unpublished development version. It uses the corrected
-Ashcore **1.1.0-SNAPSHOT**, Ashgrid **1.3.0-SNAPSHOT** (including GRID-001), and Ashspace **2.0.0-SNAPSHOT**.
+Ashcore **1.2.0-SNAPSHOT** (including OBB intervals), Ashgrid **1.3.0-SNAPSHOT** (including GRID-001),
+and Ashspace **2.0.0-SNAPSHOT** (including shape-preserving OBB conversion, SPACE-012).
 These development dependencies must be provisioned before building; their local availability does not
 establish availability in a remote Maven repository. See [verification and migration](VERIFICATION.md).
 
@@ -127,10 +128,11 @@ covers one workload; it does not establish performance for other object distribu
 - `traversal tie-break`: if multiple boundaries are hit at once, order follows traverser implementation rules.
 - `tEnter/tExit`: distances along the normalized ray; the result type determines whether they describe bounds, voxels or provider-supplied geometry.
 - `AABB`: axis-aligned bounding box.
+- `OBB`: a box with its own orientation; its enclosing AABB can include empty space.
 
 ## 8. Quick-start
 
-Requires Java 21+ and Maven. All four complete programs below are compiled with `--release 21` and run
+Requires Java 21+ and Maven. All five complete programs below are compiled with `--release 21` and run
 against the packaged JARs during `mvn -B clean verify`. The voxel example also checks dependency SPI loading.
 Ashtrace itself has no SPI providers.
 
@@ -303,6 +305,109 @@ The first result contains both surface points: X=4 and X=6. A range of 5 stops i
 so its exit is X=5 with `exitSurface=false`. A ray starting at the sphere's center has entry zero
 with `enterSurface=false` and a real exit at X=6. Whether a projectile penetrates, how it loses
 energy and what damage it causes remain application decisions.
+
+An oriented box uses Ashspace to preserve the rotated shape and to compute its separate AABB.
+The geometry callback uses Ashcore's full interval directly. The box below is rotated 45 degrees
+around Z and moved to X=6. A ray along world X crosses the shape at approximately 5.293 and 6.707;
+the enclosing AABB begins earlier. A second ray passes through an empty corner of that AABB.
+
+```java
+import nsk.nu.ashcore.api.collision.CollisionTests;
+import nsk.nu.ashcore.api.geometry.AxisAlignedBox;
+import nsk.nu.ashcore.api.geometry.OrientedBox;
+import nsk.nu.ashcore.api.geometry.Ray;
+import nsk.nu.ashcore.api.math.Quaternion;
+import nsk.nu.ashcore.api.math.Vector3;
+import nsk.nu.ashspace.api.frame.FrameGraph3;
+import nsk.nu.ashspace.api.frame.FrameId;
+import nsk.nu.ashspace.api.space.SpaceConverter3;
+import nsk.nu.ashspace.api.transform.RigidTransform3;
+import nsk.nu.ashtrace.api.broadphase.model.AabbEntry3;
+import nsk.nu.ashtrace.api.trace.contracts.RayIntersector3;
+import nsk.nu.ashtrace.api.trace.model.RayIntersection3;
+import nsk.nu.ashtrace.api.trace.pipeline.FrameExactRayTracer3;
+import nsk.nu.ashtrace.implementation.broadphase.staticindex.LinearAabbBroadPhase3;
+
+import java.util.List;
+
+public final class AshtraceOrientedBoxQuickStart {
+    public static void main(String[] args) {
+        FrameGraph3 frames = FrameGraph3.worldRoot();
+        FrameId body = new FrameId("body");
+        Vector3 zAxis = new Vector3(0, 0, 1);
+        frames.define(body, frames.root(), new RigidTransform3(
+                Quaternion.fromAxisAngle(zAxis, Math.PI / 4), new Vector3(6, 0, 0)));
+        SpaceConverter3 converter = new SpaceConverter3(frames);
+        AxisAlignedBox local = new AxisAlignedBox(new Vector3(-2, -0.5, -0.5), new Vector3(2, 0.5, 0.5));
+        OrientedBox shape = converter.orientedBox(local, body, frames.root());
+        AxisAlignedBox bounds = converter.axisAlignedBox(local, body, frames.root());
+        var index = new LinearAabbBroadPhase3<>(List.of(new AabbEntry3<>(bounds, shape)));
+        var tracer = new FrameExactRayTracer3<>(frames, index);
+        RayIntersector3<OrientedBox> geometry = (value, worldRay, min, max, output) -> {
+            var interval = CollisionTests.rayVsOrientedBoxInterval(worldRay, value);
+            if (interval.hit() && interval.tExit() >= min && interval.tEnter() <= max) {
+                output.accept(new RayIntersection3(interval.tEnter(), interval.tExit()));
+            }
+        };
+        Ray ray = new Ray(Vector3.ZERO, new Vector3(1, 0, 0));
+        var hit = tracer.firstHit(frames.root(), ray, 12, geometry);
+        if (hit == null || Math.abs(hit.tEnter() - (6 - Math.sqrt(0.5))) > 1e-12
+                || Math.abs(hit.tExit() - (6 + Math.sqrt(0.5))) > 1e-12) throw new AssertionError("OBB interval");
+        System.out.println("entry=" + hit.worldEnterPoint() + " exit=" + hit.worldExitPoint());
+        Ray corner = new Ray(new Vector3(7.5, -1.5, -2), zAxis);
+        if (!index.anyRay(corner, 4) || tracer.anyHit(frames.root(), corner, 4, geometry)) {
+            throw new AssertionError("Expected empty space inside the AABB");
+        }
+
+        // Three settings of a prescribed half-turn about Z, with the bar centered at zero.
+        frames.define(body, frames.root(), RigidTransform3.identity());
+        AxisAlignedBox start = converter.axisAlignedBox(local, body, frames.root());
+        frames.define(body, frames.root(), new RigidTransform3(new Quaternion(0, 0, 0, 1), Vector3.ZERO));
+        AxisAlignedBox end = converter.axisAlignedBox(local, body, frames.root());
+        if (!start.equals(end)) throw new AssertionError("Half-turn endpoint bounds");
+        Ray crossing = new Ray(new Vector3(0, 1.5, -2), zAxis);
+        var endpointIndex = new LinearAabbBroadPhase3<>(List.of(new AabbEntry3<>(start, "endpoints")));
+        if (endpointIndex.anyRay(crossing, 4)) throw new AssertionError("Endpoint bounds should miss");
+
+        frames.define(body, frames.root(), new RigidTransform3(Quaternion.fromAxisAngle(zAxis, Math.PI / 2), Vector3.ZERO));
+        var middleShape = converter.orientedBox(local, body, frames.root());
+        var middleBounds = converter.axisAlignedBox(local, body, frames.root());
+        var middleIndex = new LinearAabbBroadPhase3<>(List.of(new AabbEntry3<>(middleBounds, middleShape)));
+        var middleTracer = new FrameExactRayTracer3<>(frames, middleIndex);
+        if (!middleTracer.anyHit(frames.root(), crossing, 4, geometry)) throw new AssertionError("Midpoint should hit");
+        System.out.println("Rotated shape verified; endpoint bounds miss the midpoint contact.");
+    }
+}
+```
+
+The half-turn check demonstrates contact between the endpoints of one prescribed rotation. These are
+three independent pose queries; they do not find a continuous time of contact or prove that sampling
+catches every contact. The same bar can complete a full turn with identical start/end orientations.
+`querySweptAabb` translates an AABB against the indexed state and returns normalized time in `[0,1]`;
+it does not rotate the box. A caller-supplied bound covering the entire path can retrieve candidates
+through `query`, but gives no contact time. Continuous rotation queries remain deferred in CORE-013.
+
+The example stores immutable world shapes. After a pose change, recompute both shape and bound;
+rebuild a static index, or update a dynamic index and the geometry used by its provider before the
+next query. `updateBounds` changes only bounds, so an immutable world-shape payload also needs
+replacement by remove/insert, or the provider can resolve fresh geometry through a stable object ID.
+Keep the complete state fixed during the query. Saved result points and distances retain their values;
+payload references themselves are not deep copies.
+
+For `p` box parts, the provider can collect the full Ashcore intervals, sort by entry then exit, and
+merge overlapping or touching intervals before emitting them. Preserve each positive gap. This takes
+`O(p log p)` time and `O(p)` workspace in the simple list implementation; one OBB query is `O(1)`.
+Ashtrace then performs the selection/sorting costs in section 6. Bounds conversion also costs frame
+ancestry work; dynamic updates have the index costs listed there. No allocation-free claim is made.
+The multipart integration test covers overlapping parts, a cavity and clipping by a rotated grid with
+cell size 2. The library does not implement a compound-body physics model or merge provider output.
+
+Use `rayVsOrientedBoxInterval` even when a tracer query starts from a segment: it retains negative
+entry and the exit beyond the query limit, so clipped endpoints receive the correct surface flags.
+Ashcore's `segmentVsOrientedBoxInterval` instead returns clipped fractions in `[0,1]`; those values
+must not be passed directly as world distances. Floating-point conversion and collision limits from
+Ashspace/Ashcore still apply, especially near tangency and at large translations. The test tolerance
+above compares small-coordinate results; it does not inflate the shape or establish a universal bound.
 
 ## 9. Repository layout
 

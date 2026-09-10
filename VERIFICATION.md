@@ -1,6 +1,6 @@
 # Ashtrace verification and migration
 
-Latest work: [cross-library integration and quotient underflow](#2026-09-10--cross-library-integration-and-quotient-underflow).
+Latest work: [oriented-box integration, TRACE-012](#2026-09-10--oriented-box-integration-trace-012).
 The first record below describes the earlier correction checkpoint; its artifact hashes are historical.
 
 ## 2026-09-10 — Blackframe contract revision 2.0 corrections
@@ -397,3 +397,106 @@ Optional `-JavaHome`, `-MavenCommand` and `-SettingsFile` select the environment
 test copies and dependency installs stay in Ashtrace. Repairing Ashspace was a separate authorized
 source change, not an action performed by this script. TRACE-010 still needs artifact distribution
 and hosted CI before release; local success does not establish publication availability.
+
+## 2026-09-10 — Oriented-box integration, TRACE-012
+
+Branch `fix/ashtrace-rotated-primitives-20260910`, checkpoint `bbe70ff`, base `e07168f`.
+All edits, dependency installs, copied tests and build outputs in this session stayed in Ashtrace.
+Sibling artifacts and selected test sources were read, without rebuilding or editing those libraries.
+The parent Blackframe directory is not a Git repository; the checkpoint belongs to Ashtrace.
+
+### Integration and compatibility
+
+TRACE-012 uses the existing `RayIntersector3` and exact pipelines. Ashspace converts a local AABB
+to a world OBB and a separate enclosing AABB; Ashcore supplies the full supporting-line interval.
+There is no new public adapter or intersection algorithm in Ashtrace. Production Java edits only
+clarify the provider union contract, stable poses and the translation-only meaning of AABB sweep.
+Existing bounds-based results and all public signatures retain their meaning. Ashtrace remains an
+unpublished `2.0.0-SNAPSHOT`; adopting this dependency set requires the OBB-capable builds below.
+
+`OrientedBoxTraceIntegrationTest` adds seven scenarios, each exercising linear, static BVH, spatial
+hash and dynamic BVH indexes. Known-result fixtures cover rays/segments, negative full entry from
+inside, reversed direction, tangency, zero/range limits, nested frames and world points, candidate-only
+corner hits, shape ordering and each index's own full-tie order. Other fixtures cover provider-owned
+overlap merging with a preserved cavity, clipping through a rotated grid of cell size 2, coherent
+pose/bounds updates, saved result points and a half-turn whose endpoint bounds miss a middle contact.
+The absolute `1e-12` assertion tolerance applies to these small-coordinate fixtures, not to general
+geometry membership or a new runtime epsilon. Tangency uses an exact cyclic axis permutation.
+
+The fifth complete README program, `AshtraceOrientedBoxQuickStart`, compiles/runs against JARs.
+It demonstrates the OBB/AABB distinction and the half-turn counterexample. README explains world
+ray distances versus Ashcore segment fractions, complete provider intervals, multipart union costs,
+and updating immutable world-shape payloads as well as bounds. Pose samples do not establish a
+continuous contact guarantee; CORE-013 remains deferred in its owning library.
+
+### Actual dependencies and artifacts
+
+`scripts/development-dependencies.json` pins full JAR and POM SHA-256 identities. `verify-local.ps1`
+checked those files before installing them to `.verification/repository`. The resolved JAR hashes
+also matched those inputs after verification. The dependency tree contains only the three compile
+dependencies below and JUnit Jupiter 5.10.2 with test scope.
+
+| Artifact | Source commit | JAR SHA-256 |
+| --- | --- | --- |
+| Ashcore 1.2.0-SNAPSHOT | `ddbf98cb092603e3543c71485a34b5e1a36264c0` | `4aca690477eea1f3943e3c8b333da6882ff9f76fd2d99f2ceb2a6a0a9d9e1379` |
+| Ashgrid 1.3.0-SNAPSHOT | `8199f9b` | `b4a8d0ac87ebe34132f1f86d8870e8f32f5f270b95d263a0fc21e345a6e71285` |
+| Ashspace 2.0.0-SNAPSHOT | `ebf6b9e13599c0eef01ebd66dbeb69e3a8493c2f` | `eec0770d713355b67e856a831ff3d370e41baf0fedabaa9005f86dd58171f389` |
+
+This replaces the older Ashcore 1.1 and Ashspace quotient-underflow artifact set recorded above.
+Historical hashes do not describe the current manifest. No released coordinates were overwritten.
+
+| Ashtrace artifact | JDK | SHA-256 |
+| --- | --- | --- |
+| `ashtrace-2.0.0-SNAPSHOT.jar` | 21 | `6a9034819280d9c954a09e61ddae9ee0c19dd7a6e122ce74402c057d08af3170` |
+| `ashtrace-2.0.0-SNAPSHOT.jar` | 25 | `c5129e1ea5f242eb7912775de16c38d2961360029545d59e188dca484b6fcfab` |
+| `ashtrace-2.0.0-SNAPSHOT-sources.jar` | 25 | `ac0cb98417b6e166cfd15004542623d52544c15b91296a2590d7078c553d244d` |
+| `ashtrace-2.0.0-SNAPSHOT-javadoc.jar` | 25 | `2787d5437eb13a92b8f3da96e07f4c244e01cc3402f13a4182f5a1439928aae7` |
+
+Java 21 artifacts are retained in `.verification/rotated-artifacts-jdk21`; `target` holds the Java 25
+build. Main/sources/Javadoc, Java 21 class version, coordinates, LICENSE/NOTICE and absence of JUnit
+and artificial SPI in the main JAR passed `PackagedArtifactIT`. Dependency DDA service loading and
+all five examples passed. Javadoc ran with `all,-missing` and `failOnError=true`.
+
+### Executed verification
+
+Maven **3.9.16**, Eclipse Adoptium **21.0.12.1+1** and Oracle OpenJDK **25.0.2**, Windows 11 amd64,
+UTF-8, locale pl_PL; compilation release **21**. Existing tool installations were used read-only.
+
+| Check | Result |
+| --- | --- |
+| Baseline `maven.ps1 -o test` on previous dependencies | 97 tests PASS |
+| `verify-local.ps1` after dependency adoption | 97 tests + 2 artifact tests PASS |
+| `maven.ps1 -o -Dtest=OrientedBoxTraceIntegrationTest test` | 7 new tests PASS |
+| Final `verify-blackframe-tests.ps1`, JDK 21 | clean verify: 104 + 2 PASS; original lower-layer tests: 78 PASS |
+| Final `verify-blackframe-tests.ps1`, JDK 25 | clean verify: 104 + 2 PASS; original lower-layer tests: 78 PASS |
+| Public `javap` comparison against checkpoint JAR | 26 public types / 211 declarations, no removals or changes |
+
+All executed tests reported zero failures, errors and skips. The lower-layer selection expanded from
+11 to 14 unchanged source files by adding `OrientedBoxQueriesTest`, `ShapeTransforms3ApiTest` and
+`ShapeSpaceConverter3ApiTest`. Source hashes were checked before/after each run; copies and their
+POM live only under `.verification/blackframe-tests`. No sibling production build was executed.
+
+Reproduction with the manifest's ready-built artifacts and the selected source tests:
+
+```powershell
+& ./scripts/verify-blackframe-tests.ps1 -DependencyRoot ../ -JavaHome '<JDK 21 directory>' -MavenCommand '<mvn.cmd path>'
+& ./scripts/verify-blackframe-tests.ps1 -DependencyRoot ../ -JavaHome '<JDK 25 directory>' -MavenCommand '<mvn.cmd path>'
+```
+
+The local runs additionally used `-SettingsFile .verification/settings.xml`, an existing read-only
+Maven cache source with an isolated writable repository. Build commands do not publish artifacts.
+Full logs: `.verification/rotated-baseline.log`, `rotated-dependencies.log`, `rotated-first-tests.log`,
+`rotated-final-jdk21.log`, `rotated-final-jdk25.log`, `rotated-api.log`. The API baseline was the
+pre-change main JAR, SHA-256 `c72a16030e4eebc1414f94c16d89ae4c5196e9f55ef1078dcad141848bdda67d`.
+
+The initial Maven attempt in the sandbox failed to launch `mvn.cmd` with a StandardOutputEncoding
+error before running tests. The same tools ran successfully with execution escalation. Initial Git
+reads from the parent directory found no repository; Ashtrace required a per-command `safe.directory`
+override for sandbox ownership. No global Git configuration was changed. One documentation patch
+had a stale context and was reapplied after checking the file; it did not change verification results.
+
+TRACE-012 is complete locally. TRACE-010 still requires distribution of this updated dependency set
+to the hosted runner, a successful Java 21/25 CI URL for the intended commit, and final release
+coordinates/tag/destination checks. Hosted CI, push, deployment and publication were not performed;
+local success does not establish remote artifact availability. No benchmark or new performance
+guarantee was introduced.

@@ -351,7 +351,8 @@ Użytkownik zlecił uzupełnienie backlogu w granicach rewizji 2.0. Nowa propozy
 
 ## TRACE-012 — Połączyć zapytania obróconych prymitywów z indeksami AABB
 
-**Status:** OTWARTE  
+**Status:** GOTOWE
+
 **Priorytet:** P2  
 **Dowód:** DECYZJA, oparta na inspekcji punktów integracji  
 **Kontrakt:** sekcje 2, 3.4, 4.1–4.5, 5, 7
@@ -368,12 +369,28 @@ Dostawca promieniowy zwraca pełne przedziały, także z wejściem przed począt
 
 **Warunki zamknięcia:**
 
-- [ ] Wskazano wersje/JAR-y dolnych warstw; przykład kompiluje się z pakietów i nie przedstawia proponowanych API jako już dostępnych.
-- [ ] Testy obejmują promień/odcinek, start wewnątrz, styczność, limit zasięgu, obrót/przesunięcie oraz trafienie w AABB bez trafienia we właściwy kształt.
-- [ ] Sprawdzono first/last/all, przycinanie przez voxele i pustą przestrzeń między częściami; odległości pozostają w jednostkach świata.
-- [ ] Cztery indeksy dają zgodne zbiory kandydatów/wyników dla tego samego modelu, z ich własnymi zasadami remisów i kolejności. Nowy spójny stan po ruchu daje nowy wynik, a wcześniejszy wynik pozostaje niezmienny.
-- [ ] Przykład odróżnia próbki ustawienia od ciągłego kontaktu i pokazuje obrót pomijany przez same końce kroku. Nie dodano gwarancji obrotowego sweep ani reakcji na kolizję.
-- [ ] Opisano pracę dostawcy, sortowanie i aktualizacje indeksu bez obietnicy bezalokacyjności; zmieniony zakres przechodzi testy i clean verify. Stare API zachowuje znaczenie obwiedni.
+- [x] Wskazano wersje/JAR-y dolnych warstw; przykład kompiluje się z pakietów i nie przedstawia proponowanych API jako już dostępnych.
+- [x] Testy obejmują promień/odcinek, start wewnątrz, styczność, limit zasięgu, obrót/przesunięcie oraz trafienie w AABB bez trafienia we właściwy kształt.
+- [x] Sprawdzono first/last/all, przycinanie przez voxele i pustą przestrzeń między częściami; odległości pozostają w jednostkach świata.
+- [x] Cztery indeksy dają zgodne zbiory kandydatów/wyników dla tego samego modelu, z ich własnymi zasadami remisów i kolejności. Nowy spójny stan po ruchu daje nowy wynik, a wcześniejszy wynik pozostaje niezmienny.
+- [x] Przykład odróżnia próbki ustawienia od ciągłego kontaktu i pokazuje obrót pomijany przez same końce kroku. Nie dodano gwarancji obrotowego sweep ani reakcji na kolizję.
+- [x] Opisano pracę dostawcy, sortowanie i aktualizacje indeksu bez obietnicy bezalokacyjności; zmieniony zakres przechodzi testy i clean verify. Stare API zachowuje znaczenie obwiedni.
+
+**Wynik 2026-09-10:** Po zamknięciu CORE-011 i SPACE-012 przyjęto Ashcore 1.2.0-SNAPSHOT
+(`ddbf98c`) i nowy JAR Ashspace 2.0.0-SNAPSHOT (`ebf6b9e`); Ashgrid 1.3.0-SNAPSHOT pozostał
+bez zmian. Manifest zawiera hashe JAR/POM, a skrypt sprawdza je przed instalacją do repozytorium
+wewnątrz Ashtrace. Istniejący `RayIntersector3` wystarcza: przykład i siedem testów integracyjnych
+łączą pełny przedział Ashcore z konwersją Ashspace, bez nowego adaptera ani algorytmu przecięcia.
+Test dostawcy scala nakładanie części, zachowuje przerwy i sprawdza zasłanianie w obróconej siatce
+o komórce 2. Sprawdzono także remisy według `visitRay`, aktualizację dynamicznych obwiedni oraz
+przebudowę indeksów statycznych po ruchu. README/Javadoc wyjaśniają granice czasowe i jednostki.
+
+JDK 21 i 25: po **104 testy Ashtrace + 2 testy artefaktów + 78 niezmienionych testów zależności,
+PASS**, w tym pięć kompilowanych i uruchamianych przykładów README. `javap`: 26 publicznych typów,
+211 deklaracji, bez usunięć. Wersja Ashtrace pozostaje robocza 2.0.0-SNAPSHOT; nie zmieniono
+sygnatur ani algorytmów produkcyjnych. Prace i wyniki zapisano wyłącznie w Ashtrace. Szczegółowe
+polecenia, środowiska, hashe oraz ograniczenia: [VERIFICATION.md](VERIFICATION.md#2026-09-10--oriented-box-integration-trace-012).
+TRACE-010 pozostaje zablokowane dystrybucją zależności i wymaga wykonania hosted CI przed wydaniem.
 
 **Powiązania:** [CORE-011](../Ashcore/ISSUES.md#core-011), [CORE-013](../Ashcore/ISSUES.md#core-013), [SPACE-012](../Ashspace/ISSUES.md#space-012), zamknięte [TRACE-001](#trace-001), [TRACE-008](#trace-008), [TRACE-011](#trace-011). Propozycja P2 nie zmienia blokady TRACE-010. Odrzucenie zapisać jako NIE DOTYCZY z uzasadnieniem; sam plan nie oznacza GOTOWE.
 
@@ -394,8 +411,19 @@ Po kolejnej sesji dopisz wiersz i uzupełnij statusy odpowiednich zadań. Zapisz
 
 ### Przegląd zakresu kolizji 2026-09-10
 
-**Stan bieżącego przeglądu:** TRACE-012 jest otwartą propozycją P2, nie potwierdzonym błędem ani warunkiem wydania obecnego API. Statusy TRACE-001–TRACE-011 pozostają bez zmian, w tym blokada TRACE-010.
+**Historyczny stan przeglądu backlogu:** TRACE-012 było otwartą propozycją P2, nie potwierdzonym błędem ani warunkiem wydania ówczesnego API. Przegląd nie zmieniał statusów TRACE-001–TRACE-011, w tym blokady TRACE-010. Aktualny wynik TRACE-012 zapisano powyżej i poniżej.
 
 | Data / commit | ID i decyzja | Zmiana | Polecenie / test i rzeczywisty wynik | Pozostałe zależności / następny krok |
 | --- | --- | --- | --- | --- |
 | 2026-09-10 / bez operacji Git, zgodnie z instrukcją użytkownika | TRACE-012: OTWARTE, P2 / DECYZJA | Integracja obróconych prymitywów z obecnym API i granice zapytań w czasie; wyłącznie backlog | Inspekcja źródeł; kontrola struktury, odnośników i zachowania wcześniejszej treści. Testów bibliotek i buildów nie uruchamiano | Najpierw CORE-011 i część OBB w SPACE-012; TRACE-010 pozostaje zablokowane. |
+
+### Integracja obróconych prymitywów 2026-09-10
+
+**Stan aktualny:** TRACE-012 GOTOWE; TRACE-010 nadal ZABLOKOWANE. Gałąź
+`fix/ashtrace-rotated-primitives-20260910`, checkpoint `bbe70ff`, baza `e07168f`.
+Zachowano dotychczasowe API i znaczenie zapytań obwiedni. Nie wykonywano zmian ani buildów
+w dolnych bibliotekach; ich gotowe artefakty i wybrane źródła testów odczytano do integracji.
+
+| Data / commit | ID i decyzja | Zmiana | Polecenie / test i rzeczywisty wynik | Pozostałe zależności / następny krok |
+| --- | --- | --- | --- | --- |
+| 2026-09-10 / commit zawierający ten wpis; checkpoint `bbe70ff` | TRACE-012 GOTOWE | Nowe zależności OBB z manifestem, 7 scenariuszy dla czterech indeksów, piąty przykład README, kontrakty przedziałów i ruchu; poszerzenie kopii testów dolnych warstw z 11 do 14 plików | Baseline 97 PASS. Nowe 7 PASS. `verify-blackframe-tests.ps1`: JDK 21 i 25 po 104 + 2 + 78 PASS; Javadoc i przykłady z JAR PASS; javap 26 typów / 211 deklaracji bez usunięć. Początkowy Maven w sandboxie nie uruchomił procesu; te same narzędzia uruchomione z eskalacją działały poprawnie | TRACE-010: udostępnić wskazane zależności runnerowi i wykonać hosted CI dla docelowego commita. Zdalne CI/publikacja niewykonane; szczegóły i hashe w VERIFICATION.md |

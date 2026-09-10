@@ -98,12 +98,13 @@ class PackagedArtifactIT {
                 case "AshtraceBroadPhaseQuickStart" -> "value=targetA";
                 case "AshtraceMappedGridQuickStart" -> "x=1, y=0, z=0, tEnter=1.5, tExit=3.5";
                 case "AshtraceExactQuickStart" -> "entry=4.0 exit=6.0 distanceInside=2.0";
+                case "AshtraceOrientedBoxQuickStart" -> "Rotated shape verified; endpoint bounds miss the midpoint contact.";
                 default -> throw new AssertionError("Missing expectation for " + className);
             };
             assertTrue(Files.readString(output).contains(expected), Files.readString(output));
         }
         assertEquals(List.of("AshtraceQuickStart", "AshtraceBroadPhaseQuickStart",
-                "AshtraceMappedGridQuickStart", "AshtraceExactQuickStart"), classNames);
+                "AshtraceMappedGridQuickStart", "AshtraceExactQuickStart", "AshtraceOrientedBoxQuickStart"), classNames);
     }
 
     private static Path dependency(Class<?> type) throws Exception {

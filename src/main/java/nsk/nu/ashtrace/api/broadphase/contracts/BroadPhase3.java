@@ -17,7 +17,9 @@ import java.util.function.Consumer;
  *
  * <p>Do not mutate an index during queries or their callbacks. Mutable implementations are not
  * thread-safe, including concurrent reads that may rebuild a snapshot. Static indexes can be shared
- * after safe publication if callbacks and payload access are thread-safe. No index copies payloads.</p>
+ * after safe publication if callbacks and payload access are thread-safe. No index copies payloads.
+ * After moving enclosed geometry, refresh its bounds before the next query. A query bound covering
+ * an entire motion path retrieves candidates only; it does not establish contact or contact time.</p>
  */
 public interface BroadPhase3<T> {
 
