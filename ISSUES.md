@@ -45,6 +45,10 @@ Maven używa zależności rozstrzygniętych z POM i repozytoriów artefaktów. Z
 | [TRACE-004](#trace-004) | P1 | INSPEKCJA | Skorygować opis kosztu sortowania i pracy indeksów |
 | [TRACE-005](#trace-005) | P1 | DECYZJA | Zdefiniować wspierane implementacje i zgodność API |
 | [TRACE-006](#trace-006) | P1 | INSPEKCJA | Dostosować CI, pakowanie i dowody wydania |
+| [TRACE-007](#trace-007) | P2 | DECYZJA | Obsłużyć siatkę z ramką, początkiem i rozmiarem komórki |
+| [TRACE-008](#trace-008) | P2 | DECYZJA | Zwracać wejście i wyjście z geometrii dostawcy |
+| [TRACE-009](#trace-009) | P2 | INSPEKCJA | Dodać zatrzymywanie zapytań i ponowne użycie bufora |
+| [TRACE-010](#trace-010) | P1 | AUDYT | Odtworzyć build na hosted CI i potwierdzić gotowość wydania |
 
 <a id="trace-001"></a>
 
@@ -209,6 +213,99 @@ Maven używa zależności rozstrzygniętych z POM i repozytoriów artefaktów. Z
 
 **Wynik 2026-09-10:** clean verify PASS: 62 + 2 testy, JDK 21.0.12.1, Maven 3.9.16, release 21. Javadoc all,-missing/failOnError=true PASS; sprawdzone dokładne main/sources/Javadoc, LICENSE/NOTICE, współrzędne i brak JUnit w main. SPI DDA sprawdzone z JAR zależności. CI obejmuje wszystkie branche i PR-y; zdalny HEAD potwierdzono jako main. Oba workflow przeszły actionlint. dependency:tree/effective-pom potwierdziły trzy zamierzone snapshoty compile i JUnit test. Zdalne CI oraz cele Packages/Release/Central pozostają jawnie niezweryfikowane; hosted runner wymaga udostępnienia zależności rozwojowych. Zamknięcie dotyczy lokalnych kryteriów korekty, nie gotowości wydania. Dowody i następne kroki: VERIFICATION.md.
 
+<a id="trace-007"></a>
+
+## TRACE-007 — Obsłużyć siatkę z ramką, początkiem i rozmiarem komórki
+
+**Status:** GOTOWE
+
+**Decyzja:** Rozszerzenie zaakceptowane przez użytkownika po ocenie kompletności biblioteki.
+Fabryka `FrameGridRayTracer3.forGrid` przyjmuje `FrameGridSpaceMapper3`; odpowiednie fabryki
+pipeline zasłaniania korzystają z tego samego grafu. Oryginalne konstruktory nadal oznaczają
+jednostkową siatkę świata. Mapowanie współrzędnych należy do Ashspace, a przechodzenie komórek
+do Ashgrid; Ashtrace łączy te operacje i przelicza odległości wyników na jednostki świata.
+
+**Warunki zamknięcia i wynik 2026-09-10:**
+
+- [x] Rozmiar komórki, jej początek, translacja i rotacja nie zmieniają jednostek wyniku.
+- [x] Callback i wynik używają indeksów wskazanej siatki; sprawdzono także ujemne współrzędne i granice dziesiętne.
+- [x] Kolejne zapytania odzwierciedlają ruch ramki; snapshot zachowuje dawny stan.
+- [x] Oba pipeline zasłaniania stosują limit w jednostkach świata. Niereprezentowalne przeliczenia są odrzucane.
+- [x] Sześć testów `MappedGridTraceIntegrationTest` i kompletny przykład README przeszły na JDK 21 i 25.
+
+<a id="trace-008"></a>
+
+## TRACE-008 — Zwracać wejście i wyjście z geometrii dostawcy
+
+**Status:** GOTOWE
+
+**Decyzja:** `RayIntersector3` dostarcza pełne skończone przedziały `RayIntersection3` dla kandydata.
+`FrameExactRayTracer3` i `FrameOccludedExactRayTracer3` wybierają/przycinają je i zwracają
+`ExactTraceHit3` z oboma punktami świata oraz znacznikami rzeczywistych powierzchni. Przedział
+może zaczynać się przed początkiem promienia lub kończyć za limitem; przycięty punkt nie jest
+przedstawiany jako powierzchnia. Wiele przedziałów jednego obiektu zachowuje przerwy/puste wnętrze.
+
+`firstHit` wybiera najmniejsze wejście, następnie wyjście; `lastHit` największe wyjście, następnie
+wejście. Do wyjścia z pierwszego trafionego przedziału służy jego `worldExitPoint`, a nie osobne
+globalne `lastHit`. Stare `NarrowPhase3` i `TraceHit3` zachowują znaczenie obwiedni. Testy geometrii
+pozostają u dostawcy/Ashcore, a penetracja fizyczna i obrażenia poza Ashtrace.
+
+**Warunki zamknięcia i wynik 2026-09-10:**
+
+- [x] Wejście/wyjście, start wewnątrz, koniec zasięgu, styczność, wiele części i odwrotny kierunek mają jawne wyniki.
+- [x] Wybór rzeczywistych trafień może odwrócić kolejność luźnych obwiedni; zasłonięta powierzchnia jest odrzucana.
+- [x] Sprawdzono transformację do świata, remisy, segmenty, niepoprawne przedziały i użycie callbacku po jego zakończeniu.
+- [x] Czternaście testów `ExactRayTracerTest` i wykonywalny przykład sfery w README przeszły na JDK 21 i 25.
+- [x] javap zachował 19 istniejących publicznych typów / 138 deklaracji; stary skompilowany klient działa z nowym JAR-em.
+
+<a id="trace-009"></a>
+
+## TRACE-009 — Dodać zatrzymywanie zapytań i ponowne użycie bufora
+
+**Status:** GOTOWE
+
+**Decyzja:** Dodano `visitRay`/`anyRay` oraz zapytania `anyHit`. Cztery indeksy zatrzymują dalsze
+odwiedzanie/testowanie kandydatów na żądanie. Hash nadal zbiera i sortuje uchwyty przed pierwszym
+callbackiem; dynamiczny BVH nadal odbudowuje brudny snapshot. Domyślny adapter zachowuje zgodność
+starych implementacji `queryRay`, ale nie zatrzymuje ich wewnętrznej pracy.
+
+`TraceQueryBuffer3` zachowuje pojemność list między zapytaniami, usuwa referencje do obiektów
+w `finally` i odrzuca aktywne ponowne użycie. Usunięto pomocnicze opakowania kandydatów i ich
+dodatkowe kopie z oryginalnego pipeline, zachowując stabilny porządek wyników i callbacków.
+
+**Warunki zamknięcia i wynik 2026-09-10:**
+
+- [x] Zestawy i odległości `visitRay` zgadzają się z `queryRay` we wszystkich czterech indeksach.
+- [x] Zatrzymywanie, powtarzalna kolejność, wyjątki i ponowne użycie bufora są objęte testami.
+- [x] Stara implementacja skompilowana przed dodaniem metod działa przez nowy domyślny adapter.
+- [x] Zapisano pomiar przed/po dla 5000 nakładających się AABB oraz ograniczenia tego pomiaru w VERIFICATION.md.
+
+Nie zadeklarowano braku alokacji ani uniwersalnego przyspieszenia. Przebudowa dynamicznego BVH
+wymagałaby osobnego pomiaru obciążenia z mutacjami; ten pomiar jej nie uzasadnia.
+
+<a id="trace-010"></a>
+
+## TRACE-010 — Odtworzyć build na hosted CI i potwierdzić gotowość wydania
+
+**Status:** ZABLOKOWANE — potrzebna potwierdzona dystrybucja poprawionych zależności do runnera.
+
+**Wykonane lokalnie:** `scripts/verify-local.ps1` sprawdza SHA-256 wszystkich trzech JAR-ów i POM-ów
+według `scripts/development-dependencies.json`, instaluje je wyłącznie do `.verification/repository`
+w Ashtrace i uruchamia `clean verify dependency:tree`. Nie buduje ani nie zmienia bibliotek źródłowych.
+Przeszedł na JDK 25; pełna bramka przeszła również na JDK 21. Każda bramka: 85 testów + 2 testy
+artefaktów, bez błędów/pominięć. Cztery przykłady działają z pakietów, Javadoc i actionlint przechodzą.
+
+**Pozostałe warunki:**
+
+- [ ] Udostępnić runnerowi dokładnie wskazane zależności albo zweryfikowane wersje wydaniowe.
+- [ ] Uruchomić hosted CI i zapisać wynik/URL dla docelowego commita.
+- [ ] Przed publikacją wybrać nieużyte finalne współrzędne oraz potwierdzić tag, destynację i dostępność artefaktów.
+
+Zdalne HEAD-y niższych bibliotek różnią się od lokalnych commitów korekt. Sam checkout ich domyślnych
+gałęzi nie odtwarza zestawu użytego w testach. Nie zmieniano/pushowano tych bibliotek, nie uruchamiano
+deploy i nie uznano lokalnych snapshotów za potwierdzone wydanie. Instrukcja odtworzenia oraz dowody:
+[VERIFICATION.md](VERIFICATION.md#2026-09-10--mapped-grids-shape-intervals-and-query-reuse).
+
 ## Stan przekazania i dziennik sesji
 
 **Na 2026-09-09:** wszystkie zadania pozostają OTWARTE. Utworzono dokumentację; nie wprowadzono korekt kodu, nie wykonano buildów bibliotek ani publikacji. Nie uznawaj samego dodania ISSUES.md za realizację żadnego zadania.
@@ -221,3 +318,4 @@ Po kolejnej sesji dopisz wiersz i uzupełnij statusy odpowiednich zadań. Zapisz
 | --- | --- | --- | --- | --- |
 | 2026-09-09 / punkt odniesienia powyżej | Wszystkie: OTWARTE | Utworzenie planu korekt | Inspekcja statyczna; testów bibliotek nie uruchomiono | Rozpocząć od wskazanego P1 |
 | 2026-09-10 / commit dodający ten wpis; checkpoint 70d3513 | TRACE-001–TRACE-006: GOTOWE lokalnie | Korekty nearest/slab/hash, kontrakty obwiedni/zasłaniania/porządku, README/API, dependency snapshots, wersja 2.0.0-SNAPSHOT, CI i pakowanie | Bazowe 43 PASS; pierwsze regresje 2 FAIL + 1 ERROR, małe składowe 2 FAIL; końcowe clean verify 62 + 2 PASS. javap 19 typów/138 deklaracji bez usunięć; actionlint PASS. Pełne wersje, SHA i logi opisane w VERIFICATION.md | Udostępnić docelowe zależności dla hosted CI, uruchomić CI, przed wydaniem zweryfikować nowe współrzędne/tag/destynacje. Nie wykonywano push/deploy ani zmian w innych bibliotekach |
+| 2026-09-10 / commit rozszerzenia; checkpoint 5356ab5, baza 3be89a0 | TRACE-007–009 GOTOWE; TRACE-010 ZABLOKOWANE zależnościami zdalnego CI | Mapowana siatka, wejście/wyjście geometrii, first/last/any, bufor, cztery przykłady i skrypt odtwarzania buildu | Pierwsza kompilacja nowych testów: błędny import SquareXZChunkScheme, poprawiony na pakiet implementation. Następnie 82 PASS; końcowe JDK 21 i 25: po 85 + 2 PASS. javap i zgodność starego klienta PASS; actionlint PASS. Pomiar alokacji zapisany w VERIFICATION.md | Udostępnić zweryfikowane zależności i uruchomić hosted CI przed wydaniem; brak push/deploy i zmian poza Ashtrace |

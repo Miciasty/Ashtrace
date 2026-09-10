@@ -3,7 +3,8 @@ package nsk.nu.ashtrace.api.trace.model;
 import nsk.nu.ashcore.api.math.Vector3;
 
 /**
- * Result of a voxel ray hit in world-space grid coordinates.
+ * Voxel hit with grid-local cell indices, world-distance parameters and a world entry point.
+ * With the unit-world constructor, cell indices are also world unit-grid coordinates.
  */
 public record GridRayHit3(int x, int y, int z, double tEnter, double tExit, Vector3 worldPoint) {
     public GridRayHit3 {

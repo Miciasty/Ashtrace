@@ -7,6 +7,7 @@ import nsk.nu.ashgrid.api.voxel.query.Raycast;
 import nsk.nu.ashgrid.api.voxel.traversal.VoxelTraverser;
 import nsk.nu.ashspace.api.frame.FrameGraph3;
 import nsk.nu.ashspace.api.frame.FrameId;
+import nsk.nu.ashspace.api.grid.FrameGridSpaceMapper3;
 import nsk.nu.ashtrace.api.broadphase.contracts.RayQueryableBroadPhase3;
 import nsk.nu.ashtrace.api.trace.model.GridRayHit3;
 import nsk.nu.ashtrace.api.trace.model.TraceHit3;
@@ -18,8 +19,8 @@ import java.util.List;
  * "Visible" means accepted bounds intersect the clipped interval; it does not establish visibility
  * of an enclosed surface. Acceptance callbacks must respect their supplied clipped interval.
  *
- * <p>Voxels are unit cells rooted at world zero, with floor-based indices on all axes.
- * The spatial-hash cell size and Ashspace grid mappers do not configure this voxel grid.
+ * <p>The original constructor uses unit cells rooted at world zero. The forGrid factory
+ * uses the explicit grid frame, origin and cell size. Spatial-hash cell size does not configure voxels.
  * Ray parameters measure world distance after rigid frame conversion.</p>
  *
  * <p>Voxel traversal uses [0,tMax); object intervals use [0,limit], including contact exactly
@@ -45,6 +46,31 @@ public final class FrameOccludedBroadPhaseRayTracer3<T> {
         if (traverser == null) throw new NullPointerException("traverser");
         this.objectTracer = new FrameBroadPhaseRayTracer3<>(frames, broadPhase);
         this.voxelTracer = new FrameGridRayTracer3(frames, traverser);
+    }
+
+    /** Trace against an explicitly mapped grid, sharing the mapper's graph for both tracing stages. */
+    public static <T> FrameOccludedBroadPhaseRayTracer3<T> forGrid(
+            FrameGridSpaceMapper3 grid, RayQueryableBroadPhase3<T> broadPhase, VoxelTraverser traverser
+    ) {
+        return new FrameOccludedBroadPhaseRayTracer3<>(grid, broadPhase, traverser);
+    }
+
+    private FrameOccludedBroadPhaseRayTracer3(
+            FrameGridSpaceMapper3 grid, RayQueryableBroadPhase3<T> broadPhase, VoxelTraverser traverser
+    ) {
+        if (grid == null) throw new NullPointerException("grid");
+        this.objectTracer = new FrameBroadPhaseRayTracer3<>(grid.frames(), broadPhase);
+        this.voxelTracer = FrameGridRayTracer3.forGrid(grid, traverser);
+    }
+
+    /** Whether any accepted bounds candidate intersects the voxel-clipped interval. */
+    public boolean anyVisibleHit(
+            FrameId sourceFrame, Ray sourceRay, double tMax,
+            FrameBroadPhaseRayTracer3.NarrowPhase3<T> narrowPhase, Raycast.Occupancy occluder
+    ) {
+        if (narrowPhase == null) throw new NullPointerException("narrowPhase");
+        if (occluder == null) throw new NullPointerException("occluder");
+        return objectTracer.anyHit(sourceFrame, sourceRay, visibleLimit(sourceFrame, sourceRay, tMax, occluder), narrowPhase);
     }
 
     /**

@@ -1,6 +1,7 @@
 package nsk.nu.ashtrace.api.trace.model;
 
 import nsk.nu.ashcore.api.math.Vector3;
+import nsk.nu.ashcore.api.geometry.Ray;
 
 /**
  * Accepted world-space AABB interval after candidate filtering.
@@ -19,5 +20,19 @@ public record TraceHit3<T>(T value, double tEnter, double tExit, Vector3 worldPo
         if (Double.isNaN(tExit) || Double.isInfinite(tExit) || tExit < tEnter) {
             throw new IllegalArgumentException("tExit must be finite and >= tEnter");
         }
+    }
+
+    /** Alias for the clipped AABB entry point; not necessarily a shape surface. */
+    public Vector3 worldEnterPoint() {
+        return worldPoint;
+    }
+
+    /**
+     * Compute the clipped AABB exit point using the same world ray that produced this hit.
+     * At a query/occlusion limit it can lie inside the box. The record does not retain or verify the ray.
+     */
+    public Vector3 worldExitPoint(Ray worldRay) {
+        if (worldRay == null) throw new NullPointerException("worldRay");
+        return worldRay.at(tExit);
     }
 }

@@ -6,6 +6,7 @@ import nsk.nu.ashcore.api.math.Vector3;
 import nsk.nu.ashtrace.api.broadphase.contracts.BroadPhase3;
 import nsk.nu.ashtrace.api.broadphase.contracts.ProximityQueryableBroadPhase3;
 import nsk.nu.ashtrace.api.broadphase.contracts.RayQueryableBroadPhase3;
+import nsk.nu.ashtrace.api.broadphase.contracts.RayCandidateVisitor3;
 import nsk.nu.ashtrace.api.broadphase.contracts.SweepQueryableBroadPhase3;
 import nsk.nu.ashtrace.api.broadphase.model.AabbEntry3;
 import nsk.nu.ashtrace.api.broadphase.model.BroadPhaseNearestHit3;
@@ -92,6 +93,21 @@ public final class LinearAabbBroadPhase3<T> implements
                 consumer.accept(entry.value());
             }
         }
+    }
+
+    /** Visits in input order, stopping the scan when requested, without allocating hit records. */
+    @Override
+    public boolean visitRay(Ray ray, double tMax, RayCandidateVisitor3<T> visitor) {
+        if (ray == null) throw new NullPointerException("ray");
+        if (visitor == null) throw new NullPointerException("visitor");
+        if (!Double.isFinite(tMax) || tMax < 0.0) throw new IllegalArgumentException("tMax must be finite and >= 0");
+        AxisAlignedBox rayBounds = BroadPhaseMath3.rayBounds(ray, tMax);
+        for (AabbEntry3<T> entry : entries) {
+            if (!BroadPhaseMath3.intersects(rayBounds, entry.bounds())) continue;
+            BroadPhaseMath3.Interval interval = BroadPhaseMath3.rayBoxInterval(ray, entry.bounds(), tMax);
+            if (interval != null && !visitor.visit(entry.value(), interval.tEnter(), interval.tExit())) return false;
+        }
+        return true;
     }
 
     @Override

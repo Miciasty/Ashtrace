@@ -7,6 +7,7 @@ import nsk.nu.ashgrid.api.voxel.query.Raycast;
 import nsk.nu.ashgrid.api.voxel.traversal.VoxelTraverser;
 import nsk.nu.ashspace.api.frame.FrameGraph3;
 import nsk.nu.ashspace.api.frame.FrameId;
+import nsk.nu.ashspace.api.grid.FrameGridSpaceMapper3;
 import nsk.nu.ashspace.api.space.SpaceConverter3;
 import nsk.nu.ashtrace.api.trace.model.GridRayHit3;
 
@@ -15,8 +16,9 @@ import java.util.List;
 
 /**
  * Frame-aware voxel ray tracing pipeline built on Ashspace and Ashgrid.
- * Voxels are unit world cells rooted at zero, indexed by floor (including negative coordinates).
- * No cell-size or origin mapper is inferred. Parameters are world distances after rigid conversion.
+ * The original constructor uses unit world cells rooted at zero. The forGrid factory attaches
+ * cells to an explicit grid frame, origin and cell size, using Ashspace conversion and Ashgrid traversal.
+ * Results always use world-distance parameters and world points; integer coordinates belong to that grid.
  * The supplied traverser owns cell/tie ordering; the DDA provider visits [0,tMax), including
  * starting-cell and boundary tie visits, but visits nothing when tMax=0.
  * Zero-length segments are rejected. Keep frames, occupancy and traverser configuration stable
@@ -28,6 +30,7 @@ public final class FrameGridRayTracer3 {
     private final SpaceConverter3 converter;
     private final VoxelTraverser traverser;
     private final Raycast raycast;
+    private final FrameGridSpaceMapper3 grid;
 
     public FrameGridRayTracer3(FrameGraph3 frames, VoxelTraverser traverser) {
         if (frames == null) throw new NullPointerException("frames");
@@ -36,6 +39,32 @@ public final class FrameGridRayTracer3 {
         this.converter = new SpaceConverter3(frames);
         this.traverser = traverser;
         this.raycast = new Raycast(traverser);
+        this.grid = null;
+    }
+
+    /**
+     * Trace a grid attached to a frame. Retains the mapper and its live or frozen graph.
+     * World distance is divided by cellSize for traversal and multiplied back for results.
+     * The normalized cell ray and positive distance limit must remain representable; overflow
+     * or loss of a positive limit to zero is rejected. Mapping does not add a boundary epsilon.
+     */
+    public static FrameGridRayTracer3 forGrid(FrameGridSpaceMapper3 grid, VoxelTraverser traverser) {
+        return new FrameGridRayTracer3(grid, traverser);
+    }
+
+    private FrameGridRayTracer3(FrameGridSpaceMapper3 grid, VoxelTraverser traverser) {
+        if (grid == null) throw new NullPointerException("grid");
+        if (traverser == null) throw new NullPointerException("traverser");
+        this.grid = grid;
+        this.frames = grid.frames();
+        this.converter = new SpaceConverter3(frames);
+        this.traverser = traverser;
+        this.raycast = new Raycast(traverser);
+    }
+
+    /** Explicit mapper, or null for the original unit-world constructor. */
+    public FrameGridSpaceMapper3 grid() {
+        return grid;
     }
 
     /**
@@ -66,17 +95,10 @@ public final class FrameGridRayTracer3 {
         if (occupancy == null) throw new NullPointerException("occupancy");
         if (!Double.isFinite(tMax) || tMax < 0.0) throw new IllegalArgumentException("tMax must be finite and >= 0");
 
-        Ray worldRay = converter.ray(sourceRay, sourceFrame, frames.root());
-        Raycast.Hit hit = raycast.first(worldRay, tMax, occupancy);
+        QueryRay query = prepare(sourceFrame, sourceRay, tMax);
+        Raycast.Hit hit = raycast.first(query.cellRay, query.cellLimit, occupancy);
         if (hit == null) return null;
-        return new GridRayHit3(
-                hit.x(),
-                hit.y(),
-                hit.z(),
-                hit.tEnter(),
-                hit.tExit(),
-                worldRay.at(hit.tEnter())
-        );
+        return hit(query, hit.x(), hit.y(), hit.z(), hit.tEnter(), hit.tExit());
     }
 
     /**
@@ -106,13 +128,11 @@ public final class FrameGridRayTracer3 {
         if (!Double.isFinite(tMax) || tMax < 0.0) throw new IllegalArgumentException("tMax must be finite and >= 0");
         if (maxHits <= 0) throw new IllegalArgumentException("maxHits must be > 0");
 
-        Ray worldRay = converter.ray(sourceRay, sourceFrame, frames.root());
+        QueryRay query = prepare(sourceFrame, sourceRay, tMax);
         ArrayList<GridRayHit3> hits = new ArrayList<>();
-        traverser.traverse(worldRay, tMax, (x, y, z, tEnter, tExit) -> {
+        traverser.traverse(query.cellRay, query.cellLimit, (x, y, z, tEnter, tExit) -> {
             if (!occupancy.test(x, y, z)) return true;
-            double enter = Math.max(0.0, tEnter);
-            double exit = Math.max(enter, tExit);
-            hits.add(new GridRayHit3(x, y, z, enter, exit, worldRay.at(enter)));
+            hits.add(hit(query, x, y, z, tEnter, tExit));
             return hits.size() < maxHits;
         });
         return List.copyOf(hits);
@@ -156,5 +176,41 @@ public final class FrameGridRayTracer3 {
             throw new IllegalArgumentException("sourceSegment length must be finite and > 0");
         }
         return allHits(sourceFrame, new Ray(sourceSegment.a(), delta), length, occupancy, maxHits);
+    }
+
+    private QueryRay prepare(FrameId sourceFrame, Ray sourceRay, double tMax) {
+        Ray worldRay = converter.ray(sourceRay, sourceFrame, frames.root());
+        if (grid == null) return new QueryRay(worldRay, worldRay, tMax, tMax, 1.0);
+        Ray inGrid = converter.ray(sourceRay, sourceFrame, grid.gridFrame());
+        Vector3 offset = inGrid.origin().sub(grid.gridOrigin());
+        double size = grid.cellSize();
+        Vector3 origin = new Vector3(offset.x() / size, offset.y() / size, offset.z() / size);
+        double limit = tMax / size;
+        if (!Double.isFinite(limit) || (tMax > 0.0 && limit == 0.0)) {
+            throw new IllegalArgumentException("grid traversal distance is not representable");
+        }
+        return new QueryRay(worldRay, new Ray(origin, inGrid.direction()), limit, tMax, size);
+    }
+
+    private GridRayHit3 hit(QueryRay query, int x, int y, int z, double enter, double exit) {
+        double worldEnter = query.worldDistance(enter);
+        double worldExit = query.worldDistance(exit);
+        Vector3 point = query.worldRay.at(worldEnter);
+        if (!Double.isFinite(point.x()) || !Double.isFinite(point.y()) || !Double.isFinite(point.z())) {
+            throw new IllegalArgumentException("world hit point is not finite");
+        }
+        return new GridRayHit3(x, y, z, worldEnter, worldExit, point);
+    }
+
+    private record QueryRay(Ray worldRay, Ray cellRay, double cellLimit, double worldLimit, double cellSize) {
+        private double worldDistance(double cellDistance) {
+            if (!Double.isFinite(cellDistance) || cellDistance < 0.0 || cellDistance > cellLimit) {
+                throw new IllegalArgumentException("traverser returned a parameter outside its interval");
+            }
+            // Preserve the requested endpoint exactly after the distance/unit conversion round trip.
+            double worldDistance = cellDistance == cellLimit ? worldLimit : cellDistance * cellSize;
+            if (!Double.isFinite(worldDistance)) throw new IllegalArgumentException("world distance is not finite");
+            return Math.min(worldLimit, worldDistance);
+        }
     }
 }

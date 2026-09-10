@@ -1,0 +1,26 @@
+[
+  {
+    "directory": "Ashcore",
+    "artifactId": "ashcore",
+    "version": "1.1.0-SNAPSHOT",
+    "sourceCommit": "e519440",
+    "jarSha256": "9b7758dee82a8fa7338afcc7b7bf22fe02682aaff670c10dd4971be9390c845f",
+    "pomSha256": "abca48b0b3f1dce9a3eb5c68cbd90c2f68b5a3faf742622826a96053a35b5b71"
+  },
+  {
+    "directory": "Ashgrid",
+    "artifactId": "ashgrid",
+    "version": "1.3.0-SNAPSHOT",
+    "sourceCommit": "8199f9b",
+    "jarSha256": "b4a8d0ac87ebe34132f1f86d8870e8f32f5f270b95d263a0fc21e345a6e71285",
+    "pomSha256": "8fcebb8480e39255ebd9e0ac3c264e3918b08ccfa3e3da41c03c29055087e000"
+  },
+  {
+    "directory": "Ashspace",
+    "artifactId": "ashspace",
+    "version": "2.0.0-SNAPSHOT",
+    "sourceCommit": "a4c813b",
+    "jarSha256": "232b5524c201d881cfb9287906ca2eea74c2f3ee372dc0202ea1c568f46a019d",
+    "pomSha256": "60e5c008d3428c17abcbe7b95ee1780b849c8d515d1cd8c643594cb13afd499f"
+  }
+]

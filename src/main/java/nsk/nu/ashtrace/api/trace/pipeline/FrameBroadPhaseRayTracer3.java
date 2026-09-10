@@ -22,7 +22,7 @@ import java.util.List;
  * Result lists are immutable snapshots retaining payload references.
  *
  * <p>With C emitted candidates, Q broad-phase work and F total acceptance-callback cost,
- * even first-hit and limited queries cost O(Q + C log C + F), plus frame conversion.
+ * ordered first-hit and limited queries cost O(Q + C log C + F), plus frame conversion.
  * All candidates are collected before filtering; temporary storage is O(C).</p>
  */
 public final class FrameBroadPhaseRayTracer3<T> {
@@ -74,23 +74,51 @@ public final class FrameBroadPhaseRayTracer3<T> {
             double tMax,
             NarrowPhase3<T> narrowPhase
     ) {
+        return firstHit(sourceFrame, sourceRay, tMax, narrowPhase, new TraceQueryBuffer3<>());
+    }
+
+    /** First accepted AABB, using exclusive reusable candidate-list capacity. */
+    public TraceHit3<T> firstHit(
+            FrameId sourceFrame, Ray sourceRay, double tMax,
+            NarrowPhase3<T> narrowPhase, TraceQueryBuffer3<T> buffer
+    ) {
         if (sourceFrame == null) throw new NullPointerException("sourceFrame");
         if (sourceRay == null) throw new NullPointerException("sourceRay");
         if (narrowPhase == null) throw new NullPointerException("narrowPhase");
         if (!Double.isFinite(tMax) || tMax < 0.0) throw new IllegalArgumentException("tMax must be finite and >= 0");
+        if (buffer == null) throw new NullPointerException("buffer");
 
-        Ray worldRay = converter.ray(sourceRay, sourceFrame, frames.root());
-        List<BroadPhaseRayHit3<T>> candidates = orderedCandidates(worldRay, tMax);
-        for (BroadPhaseRayHit3<T> candidate : candidates) {
-            if (!narrowPhase.test(candidate.value(), worldRay, candidate.tEnter(), candidate.tExit())) continue;
-            return new TraceHit3<>(
-                    candidate.value(),
-                    candidate.tEnter(),
-                    candidate.tExit(),
-                    worldRay.at(candidate.tEnter())
-            );
+        buffer.begin();
+        try {
+            Ray worldRay = converter.ray(sourceRay, sourceFrame, frames.root());
+            orderedCandidates(worldRay, tMax, buffer);
+            for (BroadPhaseRayHit3<T> candidate : buffer.candidates) {
+                if (!narrowPhase.test(candidate.value(), worldRay, candidate.tEnter(), candidate.tExit())) continue;
+                return new TraceHit3<>(candidate.value(), candidate.tEnter(), candidate.tExit(), worldRay.at(candidate.tEnter()));
+            }
+            return null;
+        } finally {
+            buffer.end();
         }
-        return null;
+    }
+
+    /**
+     * Whether any candidate passes acceptance. Uses visitRay order rather than nearest-first order,
+     * avoiding pipeline candidate sorting and stopping later acceptance calls as soon as possible.
+     */
+    public boolean anyHit(FrameId sourceFrame, Ray sourceRay, double tMax, NarrowPhase3<T> narrowPhase) {
+        if (sourceFrame == null) throw new NullPointerException("sourceFrame");
+        if (sourceRay == null) throw new NullPointerException("sourceRay");
+        if (narrowPhase == null) throw new NullPointerException("narrowPhase");
+        if (!Double.isFinite(tMax) || tMax < 0.0) throw new IllegalArgumentException("tMax must be finite and >= 0");
+        Ray worldRay = converter.ray(sourceRay, sourceFrame, frames.root());
+        return !broadPhase.visitRay(worldRay, tMax, (value, enter, exit) -> !narrowPhase.test(value, worldRay, enter, exit));
+    }
+
+    /** Whether any accepted AABB intersects a finite nonzero closed segment. */
+    public boolean anySegmentHit(FrameId sourceFrame, Segment3 segment, NarrowPhase3<T> narrowPhase) {
+        double length = FrameExactRayTracer3.segmentLength(segment);
+        return anyHit(sourceFrame, new Ray(segment.a(), segment.b().sub(segment.a())), length, narrowPhase);
     }
 
     /**
@@ -117,27 +145,35 @@ public final class FrameBroadPhaseRayTracer3<T> {
             NarrowPhase3<T> narrowPhase,
             int maxHits
     ) {
+        return allHits(sourceFrame, sourceRay, tMax, narrowPhase, maxHits, new TraceQueryBuffer3<>());
+    }
+
+    /** Accepted AABB intervals with reusable candidate storage; the returned list is independent. */
+    public List<TraceHit3<T>> allHits(
+            FrameId sourceFrame, Ray sourceRay, double tMax, NarrowPhase3<T> narrowPhase,
+            int maxHits, TraceQueryBuffer3<T> buffer
+    ) {
         if (sourceFrame == null) throw new NullPointerException("sourceFrame");
         if (sourceRay == null) throw new NullPointerException("sourceRay");
         if (narrowPhase == null) throw new NullPointerException("narrowPhase");
         if (!Double.isFinite(tMax) || tMax < 0.0) throw new IllegalArgumentException("tMax must be finite and >= 0");
         if (maxHits <= 0) throw new IllegalArgumentException("maxHits must be > 0");
+        if (buffer == null) throw new NullPointerException("buffer");
 
-        Ray worldRay = converter.ray(sourceRay, sourceFrame, frames.root());
-        List<BroadPhaseRayHit3<T>> candidates = orderedCandidates(worldRay, tMax);
-        ArrayList<TraceHit3<T>> hits = new ArrayList<>(Math.min(candidates.size(), maxHits));
-
-        for (BroadPhaseRayHit3<T> candidate : candidates) {
-            if (!narrowPhase.test(candidate.value(), worldRay, candidate.tEnter(), candidate.tExit())) continue;
-            hits.add(new TraceHit3<>(
-                    candidate.value(),
-                    candidate.tEnter(),
-                    candidate.tExit(),
-                    worldRay.at(candidate.tEnter())
-            ));
-            if (hits.size() >= maxHits) break;
+        buffer.begin();
+        try {
+            Ray worldRay = converter.ray(sourceRay, sourceFrame, frames.root());
+            orderedCandidates(worldRay, tMax, buffer);
+            ArrayList<TraceHit3<T>> hits = new ArrayList<>(Math.min(buffer.candidates.size(), maxHits));
+            for (BroadPhaseRayHit3<T> candidate : buffer.candidates) {
+                if (!narrowPhase.test(candidate.value(), worldRay, candidate.tEnter(), candidate.tExit())) continue;
+                hits.add(new TraceHit3<>(candidate.value(), candidate.tEnter(), candidate.tExit(), worldRay.at(candidate.tEnter())));
+                if (hits.size() >= maxHits) break;
+            }
+            return List.copyOf(hits);
+        } finally {
+            buffer.end();
         }
-        return List.copyOf(hits);
     }
 
     /**
@@ -186,22 +222,10 @@ public final class FrameBroadPhaseRayTracer3<T> {
         return allHits(sourceFrame, new Ray(sourceSegment.a(), delta), length, narrowPhase, maxHits);
     }
 
-    private List<BroadPhaseRayHit3<T>> orderedCandidates(Ray worldRay, double tMax) {
-        ArrayList<OrderedCandidate<T>> ordered = new ArrayList<>();
-        final int[] index = {0};
-        broadPhase.queryRay(worldRay, tMax, candidate -> ordered.add(new OrderedCandidate<>(candidate, index[0]++)));
-        ordered.sort(Comparator
-                .comparingDouble((OrderedCandidate<T> c) -> c.candidate.tEnter())
-                .thenComparingDouble(c -> c.candidate.tExit())
-                .thenComparingInt(c -> c.order));
-
-        ArrayList<BroadPhaseRayHit3<T>> out = new ArrayList<>(ordered.size());
-        for (OrderedCandidate<T> candidate : ordered) {
-            out.add(candidate.candidate);
-        }
-        return List.copyOf(out);
-    }
-
-    private record OrderedCandidate<T>(BroadPhaseRayHit3<T> candidate, int order) {
+    private void orderedCandidates(Ray worldRay, double tMax, TraceQueryBuffer3<T> buffer) {
+        broadPhase.queryRay(worldRay, tMax, buffer.candidates::add);
+        // List.sort is stable, preserving broad-phase emission order on a full interval tie.
+        buffer.candidates.sort(Comparator.comparingDouble((BroadPhaseRayHit3<T> hit) -> hit.tEnter())
+                .thenComparingDouble(BroadPhaseRayHit3::tExit));
     }
 }

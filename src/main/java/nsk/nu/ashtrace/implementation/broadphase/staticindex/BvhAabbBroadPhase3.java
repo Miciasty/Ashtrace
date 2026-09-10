@@ -6,6 +6,7 @@ import nsk.nu.ashcore.api.math.Vector3;
 import nsk.nu.ashtrace.api.broadphase.contracts.BroadPhase3;
 import nsk.nu.ashtrace.api.broadphase.contracts.ProximityQueryableBroadPhase3;
 import nsk.nu.ashtrace.api.broadphase.contracts.RayQueryableBroadPhase3;
+import nsk.nu.ashtrace.api.broadphase.contracts.RayCandidateVisitor3;
 import nsk.nu.ashtrace.api.broadphase.contracts.SweepQueryableBroadPhase3;
 import nsk.nu.ashtrace.api.broadphase.model.AabbEntry3;
 import nsk.nu.ashtrace.api.broadphase.model.BroadPhaseNearestHit3;
@@ -127,6 +128,28 @@ public final class BvhAabbBroadPhase3<T> implements
         }
         if (root == null) return;
         querySphere(root, center, radius, consumer);
+    }
+
+    /** Visits left-to-right tree/leaf order, without the sorting performed by queryRay. */
+    @Override
+    public boolean visitRay(Ray ray, double tMax, RayCandidateVisitor3<T> visitor) {
+        if (ray == null) throw new NullPointerException("ray");
+        if (visitor == null) throw new NullPointerException("visitor");
+        if (!Double.isFinite(tMax) || tMax < 0.0) throw new IllegalArgumentException("tMax must be finite and >= 0");
+        return root == null || visitRay(root, ray, tMax, visitor);
+    }
+
+    private boolean visitRay(Node node, Ray ray, double tMax, RayCandidateVisitor3<T> visitor) {
+        if (BroadPhaseMath3.rayBoxInterval(ray, node.bounds, tMax) == null) return true;
+        if (node.isLeaf()) {
+            for (int i = node.start; i < node.end; i++) {
+                AabbEntry3<T> entry = ordered.get(i).entry;
+                BroadPhaseMath3.Interval interval = BroadPhaseMath3.rayBoxInterval(ray, entry.bounds(), tMax);
+                if (interval != null && !visitor.visit(entry.value(), interval.tEnter(), interval.tExit())) return false;
+            }
+            return true;
+        }
+        return visitRay(node.left, ray, tMax, visitor) && visitRay(node.right, ray, tMax, visitor);
     }
 
     private void querySphere(Node node, Vector3 center, double radius, Consumer<T> consumer) {

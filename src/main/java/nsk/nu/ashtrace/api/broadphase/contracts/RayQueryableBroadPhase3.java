@@ -25,6 +25,27 @@ public interface RayQueryableBroadPhase3<T> extends BroadPhase3<T> {
     void queryRay(Ray ray, double tMax, Consumer<BroadPhaseRayHit3<T>> consumer);
 
     /**
+     * Visit candidates until the visitor returns false. Returns true if enumeration completed,
+     * false if a stop was requested, including on the last candidate. No nearest-first order is promised.
+     * Built-in indexes stop their traversal/filtering; a custom implementation inheriting this
+     * fallback still completes queryRay internally but makes no further visitor calls after stopping.
+     * Callback exceptions propagate. The stable-state rules of BroadPhase3 apply.
+     */
+    default boolean visitRay(Ray ray, double tMax, RayCandidateVisitor3<T> visitor) {
+        if (visitor == null) throw new NullPointerException("visitor");
+        final boolean[] completed = {true};
+        queryRay(ray, tMax, hit -> {
+            if (completed[0]) completed[0] = visitor.visit(hit.value(), hit.tEnter(), hit.tExit());
+        });
+        return completed[0];
+    }
+
+    /** Whether any indexed AABB intersects the closed ray interval. */
+    default boolean anyRay(Ray ray, double tMax) {
+        return !visitRay(ray, tMax, (value, enter, exit) -> false);
+    }
+
+    /**
      * Emits broad-phase candidates intersected by finite {@code segment}.
      *
      * <p>Equivalent to {@code queryRay} with ray origin at {@code segment.a()},

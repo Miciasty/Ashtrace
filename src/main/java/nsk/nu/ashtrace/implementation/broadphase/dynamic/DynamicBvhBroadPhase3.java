@@ -4,6 +4,7 @@ import nsk.nu.ashcore.api.geometry.AxisAlignedBox;
 import nsk.nu.ashcore.api.geometry.Ray;
 import nsk.nu.ashcore.api.math.Vector3;
 import nsk.nu.ashtrace.api.broadphase.contracts.MutableRayBroadPhase3;
+import nsk.nu.ashtrace.api.broadphase.contracts.RayCandidateVisitor3;
 import nsk.nu.ashtrace.api.broadphase.model.AabbEntry3;
 import nsk.nu.ashtrace.api.broadphase.model.BroadPhaseNearestHit3;
 import nsk.nu.ashtrace.api.broadphase.model.BroadPhaseRayHit3;
@@ -105,6 +106,16 @@ public final class DynamicBvhBroadPhase3<T> implements MutableRayBroadPhase3<T> 
 
         ensureSnapshot();
         snapshot.querySphere(center, radius, payload -> consumer.accept(payload.value));
+    }
+
+    /** Uses the snapshot's tree/leaf visitor order, after rebuilding if dirty. */
+    @Override
+    public boolean visitRay(Ray ray, double tMax, RayCandidateVisitor3<T> visitor) {
+        if (ray == null) throw new NullPointerException("ray");
+        if (visitor == null) throw new NullPointerException("visitor");
+        if (!Double.isFinite(tMax) || tMax < 0.0) throw new IllegalArgumentException("tMax must be finite and >= 0");
+        ensureSnapshot();
+        return snapshot.visitRay(ray, tMax, (payload, enter, exit) -> visitor.visit(payload.value, enter, exit));
     }
 
     @Override

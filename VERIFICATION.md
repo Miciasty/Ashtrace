@@ -1,5 +1,8 @@
 # Ashtrace verification and migration
 
+Latest work: [mapped grids, shape intervals and query reuse](#2026-09-10--mapped-grids-shape-intervals-and-query-reuse).
+The first record below describes the earlier correction checkpoint; its artifact hashes are historical.
+
 ## 2026-09-10 — Blackframe contract revision 2.0 corrections
 
 Coordinates: `dev.nasaka.blackframe:ashtrace:2.0.0-SNAPSHOT`, an unpublished development version.
@@ -154,3 +157,128 @@ published release coordinates and rerun integration. The current POM does not in
 - **Next release:** make lower-layer release artifacts available, select unused final coordinates,
   rerun clean verification and hosted CI, then record tag/commit, destination, date, workflow URL
   and artifact-availability evidence. No deployment is needed to validate these local corrections.
+
+## 2026-09-10 — Mapped grids, shape intervals and query reuse
+
+Branch: `feat/ashtrace-complete-tracing-20260910`; checkpoint `5356ab5`, created before changes
+from the clean corrected commit `3be89a0`. Version remains the unpublished `2.0.0-SNAPSHOT`.
+All edits and build output remain in Ashtrace; siblings supplied read-only source, tests, tools and artifacts.
+
+### Scope and compatibility
+
+- TRACE-007: the `forGrid` factories attach voxel traversal and occlusion to an Ashspace mapper.
+  Grid frame, origin and uniform cell size control cell coordinates; distances and hit points remain
+  in world units. Original constructors keep the unit-world grid and their public signatures.
+  Live and frozen mapper graphs are supported, with stable state required during each complete query.
+- TRACE-008: `RayIntersector3` emits full, unclipped `RayIntersection3` intervals. New exact tracers
+  select first/last/all/any intervals and return both world endpoints, clipping flags and interval length.
+  Multiple intervals retain cavities/disconnected parts. Exact means provider-supplied geometry;
+  the provider still owns the shape solver, enclosing-bound correctness and numeric accuracy.
+  Primitive solvers and projectile physics were not moved into Ashtrace. The old boolean callback
+  and result keep their bounds meaning; `TraceHit3` only gains endpoint convenience methods.
+- TRACE-009: stoppable visitors in all four indexes, existence queries and optional reusable list
+  capacity. Original ordered queries retain ordering, including full ties and acceptance order.
+  Candidate wrapper objects and extra intermediate list copies were removed. Exact first/last
+  select without collecting/sorting all intervals; exact all-hit queries still sort all emitted hits.
+- TRACE-010: portable local provisioning/verification is ready; hosted CI and release availability
+  remain dependent on making the corrected lower-layer artifacts available to the runner.
+
+`javap -public` against the corrected baseline JAR preserved all **19 existing public types and
+138 declarations**. A client and custom index implementation compiled against that baseline ran
+with the new JAR without recompilation. A second client used the new default visitor and exact
+pipeline through that old implementation. These are specific signature/binary checks, not a
+guarantee against every conflict a third-party implementation could have with added method names.
+New APIs have no previous-release ordering contract; their tie rules are documented in README/Javadoc.
+
+### Executed checks
+
+The dependency JAR identities and scopes remain those in the earlier record. The new manifest
+also pins each matching POM's SHA-256. No production dependency or plugin version was added.
+
+| Check | Actual result |
+| --- | --- |
+| Existing suite after implementation, before new tests | 62 passed. |
+| First new-test compilation | Failed on an incorrect `SquareXZChunkScheme` import; corrected to Ashgrid's existing `implementation.grid.indexing` package. |
+| Initial extension suite | 82 passed. |
+| Final `clean verify dependency:tree`, Adoptium JDK 21.0.12.1+1 | **85 tests + 2 packaged-artifact tests passed**, no failures, errors or skips; finished 09:02:52 +02:00. |
+| Same gate via `scripts/verify-local.ps1`, Oracle OpenJDK 25.0.2 | **85 + 2 passed**, no failures, errors or skips; finished 09:05:11 +02:00. |
+| Four complete README programs | Compiled with release 21 against packaged JARs and executed in separate JVMs on each JDK. Original voxel/bounds, mapped grid, sphere entry/exit and clipping checks passed. |
+| Artifact content and Javadoc | Main/source/documentation entries for new APIs, release-21 class version, coordinates and resources passed on both JDKs. |
+| Existing public declarations / legacy binary / new visitor with legacy implementor | All passed. |
+| Both workflows | actionlint 1.7.7 passed, optional ShellCheck/Pyflakes disabled. |
+
+Both builds used Maven 3.9.16, Windows 11 amd64, UTF-8, pl_PL. Compiler release remains 21.
+The 23 added tests cover mapped-grid sizes/origins/rotation/movement/snapshots, decimal/negative
+cell positions, representability rejection, both geometry endpoints, negative direction, provider
+world coordinates, surface flags, tangency, cavity intervals, true-distance ordering, wall equality,
+segments, invalid output, expired emitters, visitor stopping, custom-index fallback and buffer
+cleanup/reentry/independent results. README adds an actual small-coordinate sphere provider;
+most contract tests deliberately supply known intervals to isolate tracer behavior from a shape solver.
+No exhaustive geometry proof or cross-platform bitwise guarantee is inferred.
+
+Logs and compatibility fixtures are retained locally under `.verification/`:
+`extensions-verify-jdk21.log`, `extensions-verify-jdk25.log`, `extensions-api.log`,
+`extensions-binary.log`, and the before/after benchmark logs. Maven reports are in `target`.
+JDK 21 artifacts were preserved under `.verification/artifacts-jdk21`; `target` contains the JDK 25 build.
+
+### Allocation and timing observation
+
+`TraceWorkloadBenchmarkMain` uses a linear index of 5000 identical overlapping AABBs, one fixed
+world ray, 100 warm-up calls and 500 measured calls. Every candidate is accepted; ordered first-hit
+returns entry distance 2. A thread allocation counter records bytes and a volatile field consumes
+the result. The baseline was measured before removing candidate wrappers/list copies.
+
+| Route | ns/query | allocated bytes/query |
+| --- | ---: | ---: |
+| Baseline ordered firstHit | 179949 | 418002 |
+| Updated ordered firstHit | 137551 | 237880 |
+| Updated ordered firstHit with reused buffer | 85269 | 162592 |
+| New anyHit, accepts first candidate | 2266 | 1248 |
+
+These are single-process sequential observations on JDK 21, not JMH results, statistical confidence
+intervals or portable latency guarantees. Reused capacity and fewer intermediate objects reduced
+observed allocation for this workload. `anyHit` answers existence, so its timing is not a nearest-hit
+speedup. Hash candidate collection and dynamic-BVH rebuilding remain; mutation-heavy or sparse
+workloads were not benchmarked. No dynamic-tree rewrite is justified by this measurement alone.
+
+### Extension artifact identity
+
+| Artifact | JDK 21 SHA-256 | JDK 25 SHA-256 |
+| --- | --- | --- |
+| Main | `1a9c81c3f3d29163542c70e0ae2b5cfb91cd05dc135d403849445cf7e0d2ce10` | `902b9d0fdb51bfa3521ed9b41cf98e356f84e2bfa2cb634ee3837110030fe037` |
+| Sources | `f27e02134ec8e632d7a5b89049bd985fb88974f5b4ada7be24854a6eb48ceb9e` | `f27e02134ec8e632d7a5b89049bd985fb88974f5b4ada7be24854a6eb48ceb9e` |
+| Javadoc | `2956dcf16ddf2b701992a92700c2868c3334ec6aad133ea098c32d567d9b1fba` | `2b445958cdda3e5f76504515186d53f5ba6e3f01680371caaea55fd256ab4c79` |
+
+Filenames remain `ashtrace-2.0.0-SNAPSHOT.jar`, `-sources.jar`, and `-javadoc.jar`.
+The binary/documentation JAR hashes differ across JDK builds; cross-toolchain byte reproducibility
+is not claimed. The pre-extension comparison JAR is the earlier `da683288...` artifact.
+
+### Reproducing the local gate and finishing release preparation
+
+With PowerShell, JDK 21+ and Maven installed, supply the directory containing the three already-built
+dependency directories (`Ashcore`, `Ashgrid`, `Ashspace`). Each needs its matching root `pom.xml`
+and `target/<artifactId>-<version>.jar`; no Git checkout or sibling build is performed by the script.
+
+```powershell
+& ./scripts/verify-local.ps1 -DependencyRoot ../
+```
+
+Use `-JavaHome`, `-MavenCommand` and `-SettingsFile` when tools/repositories need explicit paths.
+The script checks every input against `scripts/development-dependencies.json` before installation,
+then uses an isolated repository inside Ashtrace and runs `clean verify dependency:tree`. Without
+`-SettingsFile` it writes an empty settings file locally instead of loading user Maven settings;
+Maven still needs access to its build plugins and test dependencies. The local successful run used
+the existing read-only artifact cache via explicit settings. `-nsu` disables snapshot update checks;
+the manifest is an identity check for this verification set, not a general dependency lockfile.
+
+Read-only remote inspection on 2026-09-10 returned dependency default heads:
+Ashcore `ea6c715d2d451cc3636499a32b45230c525d8a72` (master), Ashgrid
+`83da6d696c1b1cd1ff43422679094cc2a8b8c532` (master), Ashspace
+`18db5782777f147476dfb40b9815fdebf63ef762` (main). These differ from the tested local correction
+commits. Checking out those remote heads alone does not reproduce the verified dependency set.
+
+To finish TRACE-010, provision these verified artifacts to hosted CI or publish verified lower-layer
+releases and update the pinned coordinates/manifest accordingly, then rerun integration and the
+hosted Java 21/25 matrix. Record its URL/commit before selecting a final release tag and destination.
+The existing publishing workflow rejects snapshot Ashtrace/dependency versions. No push, remote CI,
+deploy, GitHub release or Central publication was performed in this extension session.

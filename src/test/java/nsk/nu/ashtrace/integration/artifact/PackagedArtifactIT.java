@@ -33,7 +33,15 @@ class PackagedArtifactIT {
         try (var main = new JarFile(directory.resolve(name + ".jar").toFile());
              var sources = new JarFile(directory.resolve(name + "-sources.jar").toFile());
              var docs = new JarFile(directory.resolve(name + "-javadoc.jar").toFile())) {
-            assertNotNull(main.getJarEntry(type + ".class"));
+            for (String api : List.of(type,
+                    "nsk/nu/ashtrace/api/trace/pipeline/FrameExactRayTracer3",
+                    "nsk/nu/ashtrace/api/trace/pipeline/FrameOccludedExactRayTracer3",
+                    "nsk/nu/ashtrace/api/trace/model/ExactTraceHit3",
+                    "nsk/nu/ashtrace/api/trace/contracts/RayIntersector3")) {
+                assertNotNull(main.getJarEntry(api + ".class"));
+                assertNotNull(sources.getJarEntry(api + ".java"));
+                assertNotNull(docs.getJarEntry(api + ".html"));
+            }
             assertNotNull(main.getJarEntry("META-INF/LICENSE"));
             assertNotNull(main.getJarEntry("META-INF/NOTICE"));
             assertNotNull(sources.getJarEntry(type + ".java"));
@@ -56,7 +64,7 @@ class PackagedArtifactIT {
     }
 
     @Test
-    void both_readme_examples_compile_and_run_with_packaged_libraries_and_dda_service() throws Exception {
+    void readme_examples_compile_and_run_with_packaged_libraries_and_dda_service() throws Exception {
         Path examples = Files.createTempDirectory(directory, "readme-");
         String readme = Files.readString(Path.of(System.getProperty("projectDirectory"), "README.md"));
         var blocks = Pattern.compile("(?s)```java\\s*\\R(.*?)```").matcher(readme);
@@ -85,10 +93,17 @@ class PackagedArtifactIT {
             if (!finished) process.destroyForcibly();
             assertTrue(finished, "README example timed out");
             assertEquals(0, process.exitValue(), Files.readString(output));
-            String expected = className.equals("AshtraceQuickStart") ? "x=13" : "value=targetA";
+            String expected = switch (className) {
+                case "AshtraceQuickStart" -> "x=13";
+                case "AshtraceBroadPhaseQuickStart" -> "value=targetA";
+                case "AshtraceMappedGridQuickStart" -> "x=1, y=0, z=0, tEnter=1.5, tExit=3.5";
+                case "AshtraceExactQuickStart" -> "entry=4.0 exit=6.0 distanceInside=2.0";
+                default -> throw new AssertionError("Missing expectation for " + className);
+            };
             assertTrue(Files.readString(output).contains(expected), Files.readString(output));
         }
-        assertEquals(List.of("AshtraceQuickStart", "AshtraceBroadPhaseQuickStart"), classNames);
+        assertEquals(List.of("AshtraceQuickStart", "AshtraceBroadPhaseQuickStart",
+                "AshtraceMappedGridQuickStart", "AshtraceExactQuickStart"), classNames);
     }
 
     private static Path dependency(Class<?> type) throws Exception {

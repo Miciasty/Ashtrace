@@ -4,6 +4,7 @@ import nsk.nu.ashcore.api.geometry.AxisAlignedBox;
 import nsk.nu.ashcore.api.geometry.Ray;
 import nsk.nu.ashcore.api.math.Vector3;
 import nsk.nu.ashtrace.api.broadphase.contracts.MutableRayBroadPhase3;
+import nsk.nu.ashtrace.api.broadphase.contracts.RayCandidateVisitor3;
 import nsk.nu.ashtrace.api.broadphase.model.BroadPhaseNearestHit3;
 import nsk.nu.ashtrace.api.broadphase.model.BroadPhaseRayHit3;
 import nsk.nu.ashtrace.api.broadphase.model.BroadPhaseSweepHit3;
@@ -159,6 +160,23 @@ public final class DynamicSpatialHashBroadPhase3<T> implements MutableRayBroadPh
                 consumer.accept(entry.value);
             }
         }
+    }
+
+    /**
+     * Visits ascending handles, stopping interval tests on request. Candidate bucket collection,
+     * deduplication and handle sorting still complete before the first callback.
+     */
+    @Override
+    public boolean visitRay(Ray ray, double tMax, RayCandidateVisitor3<T> visitor) {
+        if (ray == null) throw new NullPointerException("ray");
+        if (visitor == null) throw new NullPointerException("visitor");
+        if (!Double.isFinite(tMax) || tMax < 0.0) throw new IllegalArgumentException("tMax must be finite and >= 0");
+        for (long handle : collectCandidateHandles(BroadPhaseMath3.rayBounds(ray, tMax))) {
+            Entry<T> entry = entries.get(handle);
+            BroadPhaseMath3.Interval interval = BroadPhaseMath3.rayBoxInterval(ray, entry.bounds, tMax);
+            if (interval != null && !visitor.visit(entry.value, interval.tEnter(), interval.tExit())) return false;
+        }
+        return true;
     }
 
     @Override
