@@ -50,6 +50,7 @@ Maven używa zależności rozstrzygniętych z POM i repozytoriów artefaktów. Z
 | [TRACE-009](#trace-009) | P2 | INSPEKCJA | Dodać zatrzymywanie zapytań i ponowne użycie bufora |
 | [TRACE-010](#trace-010) | P1 | AUDYT | Odtworzyć build na hosted CI i potwierdzić gotowość wydania |
 | [TRACE-011](#trace-011) | P1 | AUDYT | Sprawdzić integrację z oryginalnymi testami dolnych warstw |
+| [TRACE-012](#trace-012) | P2 | DECYZJA | Połączyć zapytania obróconych prymitywów z indeksami AABB |
 
 <a id="trace-001"></a>
 
@@ -342,6 +343,40 @@ się błędami przed testami; skrypt poprawiono. Właściwe regresje błędu map
 i przeszły po niej. Logi, wersje, hashe, polecenia i szczegóły w [VERIFICATION.md](VERIFICATION.md).
 TRACE-010 nadal wymaga udostępnienia zależności oraz wykonania zdalnego CI przed wydaniem.
 
+## Uwagi o zakresie kolizji — 2026-09-10
+
+Użytkownik zlecił uzupełnienie backlogu w granicach rewizji 2.0. Nowa propozycja dotyczy łączenia indeksów i zapytań z geometrią dolnych warstw. Nie zleca fizyki, kontrolera postaci ani adaptera Minecraft. Punkt odniesienia: lokalne źródła odczytane 2026-09-10; zgodnie z bieżącą instrukcją nie wykonywano operacji Git ani nowego checkpointu.
+
+<a id="trace-012"></a>
+
+## TRACE-012 — Połączyć zapytania obróconych prymitywów z indeksami AABB
+
+**Status:** OTWARTE  
+**Priorytet:** P2  
+**Dowód:** DECYZJA, oparta na inspekcji punktów integracji  
+**Kontrakt:** sekcje 2, 3.4, 4.1–4.5, 5, 7
+
+**Gdzie:** [RayIntersector3.java](src/main/java/nsk/nu/ashtrace/api/trace/contracts/RayIntersector3.java), [FrameExactRayTracer3.java](src/main/java/nsk/nu/ashtrace/api/trace/pipeline/FrameExactRayTracer3.java), [FrameOccludedExactRayTracer3.java](src/main/java/nsk/nu/ashtrace/api/trace/pipeline/FrameOccludedExactRayTracer3.java), [BroadPhase3.java](src/main/java/nsk/nu/ashtrace/api/broadphase/contracts/BroadPhase3.java), [SweepQueryableBroadPhase3.java](src/main/java/nsk/nu/ashtrace/api/broadphase/contracts/SweepQueryableBroadPhase3.java), testy integracyjne i [README.md](README.md).
+
+**Stan i znaczenie:** Indeksy wybierają kandydatów według AABB. RayIntersector3 i dokładne pipeline już przyjmują przedziały geometrii dostawcy, także wiele rozłącznych przedziałów. Istnieje przykład sfery; nie jest potrzebna ponowna implementacja tego mechanizmu. Zapytanie obwiedni nadal nie dowodzi kontaktu z obróconym kształtem.
+
+**Praca do wykonania:** Po ustaleniu CORE-011 i konwersji SPACE-012 dodać wykonywalny przykład oraz testy obróconego prymitywu przez istniejące API. Indeks przechowuje obwiednię, a test kształtu korzysta z Ashcore i Ashspace. Preferować kompozycję obecnych interfejsów; nowy adapter rozważyć tylko dla potwierdzonego powtarzającego się kodu integracji. Algorytmów przecięcia OBB nie przenosić do Ashtrace.
+
+Dostawca promieniowy zwraca pełne przedziały, także z wejściem przed początkiem promienia. Nie odtwarzać wyjścia z samego pierwszego t. Dla wielu części dostawca odpowiada za poprawną sumę przedziałów: zachowuje przerwy i scala nakładające się przedziały zgodnie z kontraktem. Jeden szeroki przedział nie może zasłaniać pustej przestrzeni między częściami. To kompozycja zapytania, nie system fizycznych brył złożonych.
+
+**Granica czasu:** Zapytanie opisuje jedno stabilne ustawienie geometrii, ramek i indeksu. Po zmianie ustawienia klient odświeża powiązane dane przed następnym zapytaniem. querySweptAabb nadal opisuje translację AABB względem indeksowanego stanu. Obwiednia tylko dwóch końcowych ustawień może pominąć część łuku obrotu. Dostarczona przez klienta obwiednia całej drogi daje jedynie kandydatów, bez czasu kontaktu. Ocena ciągłych testów prymitywów należy do CORE-013.
+
+**Warunki zamknięcia:**
+
+- [ ] Wskazano wersje/JAR-y dolnych warstw; przykład kompiluje się z pakietów i nie przedstawia proponowanych API jako już dostępnych.
+- [ ] Testy obejmują promień/odcinek, start wewnątrz, styczność, limit zasięgu, obrót/przesunięcie oraz trafienie w AABB bez trafienia we właściwy kształt.
+- [ ] Sprawdzono first/last/all, przycinanie przez voxele i pustą przestrzeń między częściami; odległości pozostają w jednostkach świata.
+- [ ] Cztery indeksy dają zgodne zbiory kandydatów/wyników dla tego samego modelu, z ich własnymi zasadami remisów i kolejności. Nowy spójny stan po ruchu daje nowy wynik, a wcześniejszy wynik pozostaje niezmienny.
+- [ ] Przykład odróżnia próbki ustawienia od ciągłego kontaktu i pokazuje obrót pomijany przez same końce kroku. Nie dodano gwarancji obrotowego sweep ani reakcji na kolizję.
+- [ ] Opisano pracę dostawcy, sortowanie i aktualizacje indeksu bez obietnicy bezalokacyjności; zmieniony zakres przechodzi testy i clean verify. Stare API zachowuje znaczenie obwiedni.
+
+**Powiązania:** [CORE-011](../Ashcore/ISSUES.md#core-011), [CORE-013](../Ashcore/ISSUES.md#core-013), [SPACE-012](../Ashspace/ISSUES.md#space-012), zamknięte [TRACE-001](#trace-001), [TRACE-008](#trace-008), [TRACE-011](#trace-011). Propozycja P2 nie zmienia blokady TRACE-010. Odrzucenie zapisać jako NIE DOTYCZY z uzasadnieniem; sam plan nie oznacza GOTOWE.
+
 ## Stan przekazania i dziennik sesji
 
 **Na 2026-09-09:** wszystkie zadania pozostają OTWARTE. Utworzono dokumentację; nie wprowadzono korekt kodu, nie wykonano buildów bibliotek ani publikacji. Nie uznawaj samego dodania ISSUES.md za realizację żadnego zadania.
@@ -356,3 +391,11 @@ Po kolejnej sesji dopisz wiersz i uzupełnij statusy odpowiednich zadań. Zapisz
 | 2026-09-10 / commit dodający ten wpis; checkpoint 70d3513 | TRACE-001–TRACE-006: GOTOWE lokalnie | Korekty nearest/slab/hash, kontrakty obwiedni/zasłaniania/porządku, README/API, dependency snapshots, wersja 2.0.0-SNAPSHOT, CI i pakowanie | Bazowe 43 PASS; pierwsze regresje 2 FAIL + 1 ERROR, małe składowe 2 FAIL; końcowe clean verify 62 + 2 PASS. javap 19 typów/138 deklaracji bez usunięć; actionlint PASS. Pełne wersje, SHA i logi opisane w VERIFICATION.md | Udostępnić docelowe zależności dla hosted CI, uruchomić CI, przed wydaniem zweryfikować nowe współrzędne/tag/destynacje. Nie wykonywano push/deploy ani zmian w innych bibliotekach |
 | 2026-09-10 / commit rozszerzenia; checkpoint 5356ab5, baza 3be89a0 | TRACE-007–009 GOTOWE; TRACE-010 ZABLOKOWANE zależnościami zdalnego CI | Mapowana siatka, wejście/wyjście geometrii, first/last/any, bufor, cztery przykłady i skrypt odtwarzania buildu | Pierwsza kompilacja nowych testów: błędny import SquareXZChunkScheme, poprawiony na pakiet implementation. Następnie 82 PASS; końcowe JDK 21 i 25: po 85 + 2 PASS. javap i zgodność starego klienta PASS; actionlint PASS. Pomiar alokacji zapisany w VERIFICATION.md | Udostępnić zweryfikowane zależności i uruchomić hosted CI przed wydaniem; brak push/deploy i zmian poza Ashtrace |
 | 2026-09-10 / commit integracji; checkpoint 8d70f81 | TRACE-011 GOTOWE; SPACE-011 poprawiony w f652173 po rozszerzeniu zgody | 12 scenariuszy integracyjnych, 54 niezmienione testy zależności, walidacja zaniku współrzędnych i nowy manifest Ashspace | Przed poprawką: 53/54 oryginalnych testów PASS, regresja Ashtrace FAIL, regresje Ashspace 3/7 FAIL. Po poprawce: JDK 21 i 25 po 97 + 2 + 54 PASS; Ashspace JDK 21: 74 + 2 PASS. Publiczne API zachowane | Zdalne CI/publikacja nadal niewykonane; nowe zależności wymagają dystrybucji |
+
+### Przegląd zakresu kolizji 2026-09-10
+
+**Stan bieżącego przeglądu:** TRACE-012 jest otwartą propozycją P2, nie potwierdzonym błędem ani warunkiem wydania obecnego API. Statusy TRACE-001–TRACE-011 pozostają bez zmian, w tym blokada TRACE-010.
+
+| Data / commit | ID i decyzja | Zmiana | Polecenie / test i rzeczywisty wynik | Pozostałe zależności / następny krok |
+| --- | --- | --- | --- | --- |
+| 2026-09-10 / bez operacji Git, zgodnie z instrukcją użytkownika | TRACE-012: OTWARTE, P2 / DECYZJA | Integracja obróconych prymitywów z obecnym API i granice zapytań w czasie; wyłącznie backlog | Inspekcja źródeł; kontrola struktury, odnośników i zachowania wcześniejszej treści. Testów bibliotek i buildów nie uruchamiano | Najpierw CORE-011 i część OBB w SPACE-012; TRACE-010 pozostaje zablokowane. |
