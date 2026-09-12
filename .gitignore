@@ -1,10 +1,13 @@
 target/
 .verification/
+/integration/
 /VERIFICATION
 /VERIFICATION.md
 /scripts/
 /ISSUES
 /ISSUES.md
+/BENCHMARK.md
+/BENCHMARKS.md
 !.mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
