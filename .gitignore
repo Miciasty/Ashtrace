@@ -1,5 +1,7 @@
 target/
 .verification/
+/VERIFICATION
+/VERIFICATION.md
 /scripts/
 /ISSUES
 /ISSUES.md
