@@ -1,7 +1,11 @@
 # Ashtrace verification and migration
 
-Latest work: [oriented-box integration, TRACE-012](#2026-09-10--oriented-box-integration-trace-012).
-The first record below describes the earlier correction checkpoint; its artifact hashes are historical.
+Current release coordinates: **Ashtrace 2.0.0**, with Ashcore **1.2.0**, Ashgrid **1.3.0** and Ashspace **2.0.0**.
+The current source set passed **104 tests + 2 artifact tests** as part of the 545-test Java 21
+[shared release verification](../Ashnav/VERIFICATION.md#release-version-alignment).
+That record contains current artifact hashes and reproduction. The input manifest now pins release
+JARs/POMs; its old filename is retained for tooling compatibility. No Git operations or publication
+were performed. The records below retain their historical snapshot versions and hashes.
 
 ## 2026-09-10 — Blackframe contract revision 2.0 corrections
 

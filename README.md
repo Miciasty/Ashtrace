@@ -3,10 +3,10 @@
 Ashtrace finds ray, overlap, proximity and moving-box candidates in indexed AABBs, selects caller-supplied
 shape intersections, and traces voxel grids attached to coordinate frames.
 
-This checkout builds **2.0.0-SNAPSHOT**, an unpublished development version. It uses the corrected
-Ashcore **1.2.0-SNAPSHOT** (including OBB intervals), Ashgrid **1.3.0-SNAPSHOT** (including GRID-001),
-and Ashspace **2.0.0-SNAPSHOT** (including shape-preserving OBB conversion, SPACE-012).
-These development dependencies must be provisioned before building; their local availability does not
+This checkout uses release version **2.0.0**. It uses the corrected
+Ashcore **1.2.0** (including OBB intervals), Ashgrid **1.3.0** (including GRID-001),
+and Ashspace **2.0.0** (including shape-preserving OBB conversion, SPACE-012).
+These dependencies must be provisioned before building; their local availability does not
 establish availability in a remote Maven repository. See [verification and migration](VERIFICATION.md).
 
 > [!NOTE]
@@ -142,7 +142,7 @@ Maven:
 <dependency>
   <groupId>dev.nasaka.blackframe</groupId>
   <artifactId>ashtrace</artifactId>
-  <version>2.0.0-SNAPSHOT</version>
+  <version>2.0.0</version>
 </dependency>
 ```
 
@@ -573,7 +573,7 @@ signature is intentionally removed or moved by these corrections.
 
 `NarrowPhase3` and `TraceHit3` keep their signatures and bounds-based meaning, including wall equality.
 Code treating their output as an exact surface hit must adopt the candidate interpretation above.
-`2.0.0-SNAPSHOT` reserves a major version for stricter numeric/range validation and the Ashspace 2.0
+`2.0.0` reserves a major version for stricter numeric/range validation and the Ashspace 2.0
 dependency contract. Nearest now respects `maxDistance` in BVH leaves; very small motion can return
 previously missed contacts; hash decimal-boundary mapping uses division and rejects unsupported ranges.
 The corrected Ashgrid dependency fixes negative-direction voxel intervals. Ashcore supplies corrected
