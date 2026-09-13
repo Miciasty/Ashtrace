@@ -5,6 +5,10 @@ shape intersections, and traces voxel grids attached to coordinate frames.
 
 Version **2.0.0** is available from [Maven Central](https://central.sonatype.com/artifact/dev.nasaka.blackframe/ashtrace/2.0.0).
 
+The [WIKI](https://miciasty.github.io/Ashtrace/) provides installation instructions, runnable examples,
+interactive explanations, and the API reference. See [WIKI authoring and publication](wiki/README.md)
+to preview or build the documentation from this checkout.
+
 > [!NOTE]
 > Ashtrace is the tracing layer above Ashspace and Ashgrid:
 >

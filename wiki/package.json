@@ -1,0 +1,23 @@
+{
+  "name": "ashtrace-wiki",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Ashtrace 2.0.0 documentation for GitHub Pages.",
+  "scripts": {
+    "build": "npm run build:css && npm run check && npm run check:diagrams && node build.mjs",
+    "watch:css": "tailwindcss -i ./src/input.css -o ./assets/styles.css --watch=always",
+    "dev": "node dev.mjs",
+    "preview": "node preview.mjs",
+    "check": "node check.mjs",
+    "build:css": "tailwindcss -i ./src/input.css -o ./assets/styles.css --minify",
+    "check:diagrams": "node check-diagrams.mjs",
+    "check:examples": "node check-examples.mjs"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "4.3.3",
+    "tailwindcss": "4.3.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
